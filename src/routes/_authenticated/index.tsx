@@ -4,7 +4,7 @@ import { AppHeader } from "@/components/painel/AppHeader";
 import { CarteiraTab } from "@/components/painel/CarteiraTab";
 import { CaixaTab } from "@/components/painel/CaixaTab";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Painel de Cheques · Grupo Ley" },

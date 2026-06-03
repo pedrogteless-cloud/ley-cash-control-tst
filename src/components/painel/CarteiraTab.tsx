@@ -1,10 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { AlertTriangle, Send, Clock, FileText, Wallet, TruckIcon, PlusCircle } from "lucide-react";
-import { mudancasDia } from "@/data/painel";
+import { AlertTriangle, Send, Clock, FileText, Wallet } from "lucide-react";
 import { isEnviar } from "@/data/painel";
 import { useStore } from "@/data/store";
 import { brl } from "@/lib/format";
@@ -51,33 +50,9 @@ export function CarteiraTab() {
 
   const enviarCount = totals.enviar.qtd;
 
-  const iconMap: Record<string, ReactNode> = {
-    plus: <PlusCircle className="h-5 w-5" />,
-    truck: <TruckIcon className="h-5 w-5" />,
-    alert: <AlertTriangle className="h-5 w-5" />,
-  };
-
   return (
     <div className="space-y-6">
-      {/* Mudanças */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Mudanças em relação ao dia anterior
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {mudancasDia.map((m, i) => (
-            <div key={i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold-dim text-gold">
-                {iconMap[m.icone]}
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-foreground">{m.titulo}</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">{m.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+
 
       {/* Alerta */}
       {enviarCount > 0 && (
