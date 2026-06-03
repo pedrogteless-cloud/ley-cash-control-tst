@@ -86,7 +86,7 @@ function NotasManager() {
 
   const handleSubmit = (data: typeof emptyNota) => {
     if (editing === "new") addNota(data);
-    else if (editing && editing !== "new") updateNota(editing.id, data);
+    else if (editing) updateNota(editing.id, data);
     setEditing(null);
   };
 
@@ -284,7 +284,7 @@ function CaixaManager() {
   const handleSubmit = (data: typeof emptyCaixa) => {
     const payload = { ...data, destino: data.destino.trim() || undefined };
     if (editing === "new") addCaixa(payload);
-    else if (editing && editing !== "new") updateCaixa(editing.id, payload);
+    else if (editing) updateCaixa(editing.id, payload);
     setEditing(null);
   };
 
