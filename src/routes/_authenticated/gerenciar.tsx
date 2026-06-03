@@ -1,9 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Plus, Pencil, Trash2, Save, X } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Shield } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { useStore, type NFRecord, type CaixaRecord } from "@/data/store";
 import { brl } from "@/lib/format";
 import { isEnviar } from "@/data/painel";
+import { listTeam, setRole } from "@/lib/api/roles.functions";
+import { useRoles } from "@/hooks/use-role";
 
 export const Route = createFileRoute("/_authenticated/gerenciar")({
   head: () => ({
