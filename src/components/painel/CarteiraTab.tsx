@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
@@ -48,7 +48,7 @@ export function CarteiraTab() {
 
   const enviarCount = totals.enviar.qtd;
 
-  const iconMap: Record<string, JSX.Element> = {
+  const iconMap: Record<string, ReactNode> = {
     plus: <PlusCircle className="h-5 w-5" />,
     truck: <TruckIcon className="h-5 w-5" />,
     alert: <AlertTriangle className="h-5 w-5" />,
