@@ -1,10 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { AlertTriangle, Send, Clock, FileText, Wallet, TruckIcon, PlusCircle } from "lucide-react";
-import { mudancasDia } from "@/data/painel";
+import { AlertTriangle, Send, Clock, FileText, Wallet } from "lucide-react";
 import { isEnviar } from "@/data/painel";
 import { useStore } from "@/data/store";
 import { brl } from "@/lib/format";
