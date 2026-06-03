@@ -5,7 +5,7 @@ import { useStore, type NFRecord, type CaixaRecord } from "@/data/store";
 import { brl } from "@/lib/format";
 import { isEnviar } from "@/data/painel";
 
-export const Route = createFileRoute("/gerenciar")({
+export const Route = createFileRoute("/_authenticated/gerenciar")({
   head: () => ({
     meta: [
       { title: "Gerenciar · Painel de Cheques" },
