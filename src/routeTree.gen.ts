@@ -9,8 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as GerenciarRouteImport } from './routes/gerenciar'
 import { Route as IndexRouteImport } from './routes/index'
 
+const GerenciarRoute = GerenciarRouteImport.update({
+  id: '/gerenciar',
+  path: '/gerenciar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +25,39 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/gerenciar': typeof GerenciarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/gerenciar': typeof GerenciarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/gerenciar': typeof GerenciarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/gerenciar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/gerenciar'
+  id: '__root__' | '/' | '/gerenciar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GerenciarRoute: typeof GerenciarRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/gerenciar': {
+      id: '/gerenciar'
+      path: '/gerenciar'
+      fullPath: '/gerenciar'
+      preLoaderRoute: typeof GerenciarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +70,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GerenciarRoute: GerenciarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

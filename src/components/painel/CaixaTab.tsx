@@ -2,15 +2,22 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { Wallet, ArrowDownToLine, ArrowUpFromLine, Shield } from "lucide-react";
-import { caixa, notas } from "@/data/painel";
 import { brl } from "@/lib/format";
 import { KpiCard } from "./KpiCard";
-
-const totalCarteira = notas.reduce((s, n) => s + n.valor, 0);
+import { useStore } from "@/data/store";
 
 export function CaixaTab() {
+  const { notas, caixa } = useStore();
+  const totalCarteira = notas.reduce((s, n) => s + n.valor, 0);
+  if (!caixa.length) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+        Nenhum movimento de caixa cadastrado.
+      </div>
+    );
+  }
   const ultimo = caixa[caixa.length - 1];
-  const cobertura = (ultimo.saldoTotal / totalCarteira) * 100;
+  const cobertura = totalCarteira > 0 ? (ultimo.saldoTotal / totalCarteira) * 100 : 0;
 
   const lineData = caixa.map((c) => ({
     data: c.data, Saldo: c.saldoTotal, Entrada: c.entrada, Saida: c.saida,
