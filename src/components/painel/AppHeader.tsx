@@ -1,16 +1,27 @@
+import { Link } from "@tanstack/react-router";
+import { Settings2 } from "lucide-react";
 import { brl } from "@/lib/format";
-import { caixa, notas } from "@/data/painel";
-
-const totalCarteira = notas.reduce((s, n) => s + n.valor, 0);
-const saldoAtual = caixa[caixa.length - 1].saldoTotal;
-const cobertura = (saldoAtual / totalCarteira) * 100;
+import { useStore } from "@/data/store";
 
 export function AppHeader() {
+  const { notas, caixa } = useStore();
+  const totalCarteira = notas.reduce((s, n) => s + n.valor, 0);
+  const saldoAtual = caixa.length ? caixa[caixa.length - 1].saldoTotal : 0;
+  const cobertura = totalCarteira > 0 ? (saldoAtual / totalCarteira) * 100 : 0;
+
   return (
     <header className="header-gradient sticky top-0 z-40 border-b border-border">
       <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6">
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">
-          ◆ Cheques Fornecedores · Grupo Ley
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">
+            ◆ Cheques Fornecedores · Grupo Ley
+          </div>
+          <Link
+            to="/gerenciar"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-gold hover:border-gold/40 transition-colors"
+          >
+            <Settings2 className="h-3.5 w-3.5" /> Gerenciar
+          </Link>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl lg:text-4xl">
