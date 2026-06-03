@@ -4,7 +4,9 @@ import {
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { AlertTriangle, Send, Clock, FileText, Wallet, TruckIcon, PlusCircle } from "lucide-react";
-import { notas, isEnviar, mudancasDia } from "@/data/painel";
+import { mudancasDia } from "@/data/painel";
+import { isEnviar } from "@/data/painel";
+import { useStore } from "@/data/store";
 import { brl } from "@/lib/format";
 import { KpiCard } from "./KpiCard";
 
@@ -12,6 +14,7 @@ const FILTERS = ["Todas", "Enviar Cheque", "Não Chegou", "Esp. entrega"] as con
 type Filter = (typeof FILTERS)[number];
 
 export function CarteiraTab() {
+  const { notas } = useStore();
   const [filter, setFilter] = useState<Filter>("Todas");
 
   const totals = useMemo(() => {
