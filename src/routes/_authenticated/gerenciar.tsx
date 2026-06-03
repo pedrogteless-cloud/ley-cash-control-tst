@@ -20,9 +20,10 @@ export const Route = createFileRoute("/_authenticated/gerenciar")({
   component: GerenciarPage,
 });
 
-type Tab = "nfs" | "caixa";
+type Tab = "nfs" | "caixa" | "time";
 
 function GerenciarPage() {
+  const { isAdmin } = useRoles();
   const [tab, setTab] = useState<Tab>("nfs");
 
   return (
