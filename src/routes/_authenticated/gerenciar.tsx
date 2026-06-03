@@ -46,10 +46,11 @@ function GerenciarPage() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 pt-5 sm:px-6">
-        <div className="inline-flex rounded-xl border border-border bg-surface p-1">
+        <div className="inline-flex flex-wrap rounded-xl border border-border bg-surface p-1">
           {([
             { id: "nfs", label: "Notas Fiscais" },
             { id: "caixa", label: "Movimentos de Caixa" },
+            ...(isAdmin ? [{ id: "time" as const, label: "Time" }] : []),
           ] as { id: Tab; label: string }[]).map((t) => (
             <button
               key={t.id}
@@ -67,7 +68,9 @@ function GerenciarPage() {
       </div>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-        {tab === "nfs" ? <NotasManager /> : <CaixaManager />}
+        {tab === "nfs" && <NotasManager />}
+        {tab === "caixa" && <CaixaManager />}
+        {tab === "time" && isAdmin && <TeamManager />}
       </main>
     </div>
   );
