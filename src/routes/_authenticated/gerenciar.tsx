@@ -430,7 +430,116 @@ function CaixaForm({
   );
 }
 
+/* ------------- Time / Papéis ------------- */
+
+const ROLE_LABELS: Record<string, { label: string; hint: string }> = {
+  admin: { label: "Admin", hint: "Acesso total + gerencia o time" },
+  lancador_nf: { label: "Lançador NF", hint: "Cria/edita notas fiscais" },
+  lancador_caixa: { label: "Lançador Caixa", hint: "Cria/edita movimentos de caixa" },
+  diretoria: { label: "Diretoria", hint: "Apenas visualização" },
+};
+const ALL_ROLES = ["admin", "lancador_nf", "lancador_caixa", "diretoria"] as const;
+
+function TeamManager() {
+  const listFn = useServerFn(listTeam);
+  const setRoleFn = useServerFn(setRole);
+  const qc = useQueryClient();
+
+  const { data: team, isLoading, error } = useQuery({
+    queryKey: ["team"],
+    queryFn: () => listFn(),
+  });
+
+  const mut = useMutation({
+    mutationFn: (vars: { userId: string; role: typeof ALL_ROLES[number]; enabled: boolean }) =>
+      setRoleFn({ data: vars }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team"] });
+      toast.success("Papel atualizado");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          <Users className="h-5 w-5 text-gold" /> Time
+          <span className="text-muted-foreground">({team?.length ?? 0})</span>
+        </h2>
+      </div>
+
+      <div className="rounded-xl border border-blue/30 bg-blue-dim/50 p-4 text-sm text-soft-foreground">
+        <div className="mb-1 flex items-center gap-2 font-semibold text-blue">
+          <Shield className="h-4 w-4" /> Como adicionar alguém
+        </div>
+        Peça à pessoa para acessar <span className="font-mono text-foreground">/auth</span> e criar uma conta.
+        Depois volte aqui e marque os papéis dela. Por padrão, novos usuários entram como <b>Diretoria</b> (só leitura).
+      </div>
+
+      {isLoading && <div className="text-sm text-muted-foreground">Carregando time...</div>}
+      {error && <div className="text-sm text-red">{(error as Error).message}</div>}
+
+      {team && (
+        <div className="rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">Usuário</th>
+                  {ALL_ROLES.map((r) => (
+                    <th key={r} className="px-3 py-3 text-center font-medium">
+                      <div>{ROLE_LABELS[r].label}</div>
+                      <div className="font-normal normal-case text-[10px] text-muted-foreground/80">
+                        {ROLE_LABELS[r].hint}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {team.map((u) => (
+                  <tr key={u.id} className="border-b border-border/50 last:border-0">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-foreground">{u.displayName || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{u.email}</div>
+                    </td>
+                    {ALL_ROLES.map((r) => {
+                      const has = u.roles.includes(r);
+                      return (
+                        <td key={r} className="px-3 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={has}
+                            disabled={mut.isPending}
+                            onChange={(e) =>
+                              mut.mutate({ userId: u.id, role: r, enabled: e.target.checked })
+                            }
+                            className="h-5 w-5 cursor-pointer accent-gold"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+                {team.length === 0 && (
+                  <tr>
+                    <td colSpan={ALL_ROLES.length + 1} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      Nenhum usuário cadastrado ainda.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ------------- Helpers ------------- */
+
 
 const inputCls =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold";
