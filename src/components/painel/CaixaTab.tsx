@@ -17,7 +17,7 @@ export function CaixaTab() {
     );
   }
   const ultimo = caixa[caixa.length - 1];
-  const cobertura = (ultimo.saldoTotal / totalCarteira) * 100;
+  const cobertura = totalCarteira > 0 ? (ultimo.saldoTotal / totalCarteira) * 100 : 0;
 
   const lineData = caixa.map((c) => ({
     data: c.data, Saldo: c.saldoTotal, Entrada: c.entrada, Saida: c.saida,
