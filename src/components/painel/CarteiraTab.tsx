@@ -29,20 +29,20 @@ export function CarteiraTab() {
       apenasFat: { qtd: apenasFat.length, val: sum(apenasFat) },
       total,
     };
-  }, []);
+  }, [notas]);
 
   const filtered = useMemo(() => {
     if (filter === "Todas") return notas;
     if (filter === "Enviar Cheque") return notas.filter(isEnviar);
     if (filter === "Não Chegou") return notas.filter((n) => n.entrega.toUpperCase().includes("NÃO"));
     return notas.filter((n) => !isEnviar(n));
-  }, [filter]);
+  }, [filter, notas]);
 
   const porFornecedor = useMemo(() => {
     const m = new Map<string, number>();
     notas.forEach((n) => m.set(n.fornecedor, (m.get(n.fornecedor) || 0) + n.valor));
     return Array.from(m, ([fornecedor, valor]) => ({ fornecedor, valor })).sort((a, b) => b.valor - a.valor);
-  }, []);
+  }, [notas]);
 
   const pieData = [
     { name: "Enviar Cheque", value: totals.enviar.val, color: "#FF9F43" },
