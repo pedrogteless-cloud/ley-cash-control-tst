@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Info } from "lucide-react";
 import { AppHeader } from "@/components/painel/AppHeader";
 import { CarteiraTab } from "@/components/painel/CarteiraTab";
 import { CaixaTab } from "@/components/painel/CaixaTab";
 import { MobileTabBar } from "@/components/painel/MobileTabBar";
+import { useStore } from "@/data/store";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -20,6 +21,19 @@ type Tab = "carteira" | "caixa";
 
 function Painel() {
   const [tab, setTab] = useState<Tab>("carteira");
+  const { notas, caixa } = useStore();
+
+  const atualizadoEm = useMemo(() => {
+    const times: number[] = [];
+    notas.forEach((n) => n.createdAt && times.push(new Date(n.createdAt).getTime()));
+    caixa.forEach((c) => {
+      if (c.createdAt) times.push(new Date(c.createdAt).getTime());
+      if (c.data) times.push(new Date(c.data).getTime());
+    });
+    const valid = times.filter((t) => Number.isFinite(t));
+    const d = valid.length ? new Date(Math.max(...valid)) : new Date();
+    return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(d);
+  }, [notas, caixa]);
 
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
@@ -58,7 +72,7 @@ function Painel() {
 
       <footer className="border-t border-border bg-surface mb-16 sm:mb-0">
         <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-gold sm:px-6">
-          Atualizado em 01 de junho de 2026
+          Atualizado em {atualizadoEm}
         </div>
       </footer>
 
