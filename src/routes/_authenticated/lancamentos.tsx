@@ -91,13 +91,14 @@ function Lancamentos() {
             </button>
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-foreground sm:text-2xl">Lançamentos</h1>
               <p className="text-xs text-soft-foreground sm:text-sm">
                 Registre novas notas e movimentos de caixa.
               </p>
             </div>
+            <TodayCounter notas={notas} caixa={caixa} />
           </div>
 
           <div className="mt-4 inline-flex rounded-xl border border-border bg-surface p-1">
