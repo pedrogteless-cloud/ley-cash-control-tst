@@ -20,12 +20,22 @@ export function AppHeader() {
             ◆ Cheques · Grupo Ley
           </div>
           <div className="flex items-center gap-1.5">
-            <Link
-              to="/gerenciar"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-gold hover:border-gold/40 transition-colors"
-            >
-              <Settings2 className="h-3.5 w-3.5" /> Gerenciar
-            </Link>
+            {canWrite && (
+              <Link
+                to="/lancamentos"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-background hover:bg-gold/90 transition-colors"
+              >
+                <ClipboardEdit className="h-3.5 w-3.5" /> Lançar
+              </Link>
+            )}
+            {isAdmin && (
+              <Link
+                to="/gerenciar"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-gold hover:border-gold/40 transition-colors"
+              >
+                <Settings2 className="h-3.5 w-3.5" /> Gerenciar
+              </Link>
+            )}
             <button
               onClick={() => supabase.auth.signOut()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-soft-foreground hover:text-red hover:border-red/40 transition-colors"
