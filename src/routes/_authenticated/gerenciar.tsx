@@ -409,7 +409,7 @@ function CaixaManager() {
               </tr>
             </thead>
             <tbody>
-              {caixa.map((c) => (
+              {filtered.map((c) => (
                 <tr key={c.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
                   <td className="px-4 py-3 font-semibold text-foreground">{c.data}</td>
                   <td className="px-4 py-3 text-right text-soft-foreground">{brl(c.saldoAnterior)}</td>
@@ -429,8 +429,10 @@ function CaixaManager() {
                   </td>
                 </tr>
               ))}
-              {caixa.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum movimento cadastrado.</td></tr>
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  {caixa.length === 0 ? "Nenhum movimento cadastrado." : "Nenhum movimento para essa busca."}
+                </td></tr>
               )}
             </tbody>
           </table>
