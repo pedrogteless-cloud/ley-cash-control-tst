@@ -52,13 +52,31 @@ export function AppHeader() {
             Painel de Controle
           </h1>
           <span className="rounded-full bg-gold-dim px-2.5 py-0.5 text-[11px] font-semibold text-gold ring-1 ring-gold/30">
-            {(() => {
+            Hoje · {(() => {
               const d = new Date();
               const dia = String(d.getDate()).padStart(2, "0");
               const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "");
               return `${dia} ${mes} · ${d.getFullYear()}`;
             })()}
           </span>
+          {(() => {
+            const times: number[] = [];
+            notas.forEach((n) => n.createdAt && times.push(new Date(n.createdAt).getTime()));
+            caixa.forEach((c) => {
+              if (c.createdAt) times.push(new Date(c.createdAt).getTime());
+              if (c.data) times.push(new Date(c.data).getTime());
+            });
+            const valid = times.filter((t) => Number.isFinite(t));
+            if (!valid.length) return null;
+            const d = new Date(Math.max(...valid));
+            const dia = String(d.getDate()).padStart(2, "0");
+            const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "");
+            return (
+              <span className="rounded-full bg-blue-dim px-2.5 py-0.5 text-[11px] font-semibold text-blue ring-1 ring-blue/30">
+                Última atualização · {dia} {mes} · {d.getFullYear()}
+              </span>
+            );
+          })()}
           {isAdmin && (
             <span className="rounded-full bg-green-dim px-2.5 py-0.5 text-[11px] font-semibold text-green ring-1 ring-green/30">
               Admin
