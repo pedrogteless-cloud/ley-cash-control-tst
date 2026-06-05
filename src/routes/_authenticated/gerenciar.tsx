@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Shield } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Shield, Search } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -90,6 +90,26 @@ const emptyNota = {
 function NotasManager() {
   const { notas, addNota, updateNota, removeNota } = useStore();
   const [editing, setEditing] = useState<NFRecord | "new" | null>(null);
+  const [search, setSearch] = useState("");
+  const [filial, setFilial] = useState<string>("Todas");
+
+  const filiais = useMemo(() => {
+    const s = new Set<string>();
+    notas.forEach((n) => n.filial && s.add(n.filial));
+    return ["Todas", ...Array.from(s).sort()];
+  }, [notas]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return notas.filter((n) => {
+      if (filial !== "Todas" && n.filial !== filial) return false;
+      if (!q) return true;
+      return (
+        n.fornecedor.toLowerCase().includes(q) ||
+        n.nf.toLowerCase().includes(q)
+      );
+    });
+  }, [notas, search, filial]);
 
   const initial = editing === "new" || editing === null ? emptyNota : editing;
 
@@ -103,15 +123,43 @@ function NotasManager() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-foreground">
-          Notas fiscais <span className="text-muted-foreground">({notas.length})</span>
+          Notas fiscais{" "}
+          <span className="text-muted-foreground">
+            ({filtered.length}
+            {filtered.length !== notas.length ? ` de ${notas.length}` : ""})
+          </span>
         </h2>
         <button
           onClick={() => setEditing("new")}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-sm font-bold text-background hover:bg-gold/90 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-card px-3 py-2 text-sm font-semibold text-gold hover:bg-gold-dim transition-colors"
         >
           <Plus className="h-4 w-4" /> Nova NF
         </button>
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar fornecedor ou nº NF..."
+            className="w-full rounded-lg border border-border bg-surface pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+          />
+        </div>
+        <select
+          value={filial}
+          onChange={(e) => setFilial(e.target.value)}
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+        >
+          {filiais.map((f) => (
+            <option key={f} value={f}>
+              Filial: {f}
+            </option>
+          ))}
+        </select>
+      </div>
+
 
       {editing !== null && (
         <NotaForm
@@ -138,7 +186,7 @@ function NotasManager() {
               </tr>
             </thead>
             <tbody>
-              {notas.map((n) => {
+              {filtered.map((n) => {
                 const enviar = isEnviar(n);
                 return (
                   <tr key={n.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
@@ -176,8 +224,10 @@ function NotasManager() {
                   </tr>
                 );
               })}
-              {notas.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma NF cadastrada.</td></tr>
+              {filtered.length === 0 && (
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  {notas.length === 0 ? "Nenhuma NF cadastrada." : "Nenhuma NF para esse filtro."}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -278,6 +328,15 @@ const emptyCaixa = {
 function CaixaManager() {
   const { caixa, addCaixa, updateCaixa, removeCaixa } = useStore();
   const [editing, setEditing] = useState<CaixaRecord | "new" | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return caixa;
+    return caixa.filter(
+      (c) => c.data.toLowerCase().includes(q) || (c.destino ?? "").toLowerCase().includes(q)
+    );
+  }, [caixa, search]);
 
   const today = new Date();
   const todayStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}`;
@@ -301,15 +360,30 @@ function CaixaManager() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-foreground">
-          Movimentos do caixa <span className="text-muted-foreground">({caixa.length})</span>
+          Movimentos do caixa{" "}
+          <span className="text-muted-foreground">
+            ({filtered.length}
+            {filtered.length !== caixa.length ? ` de ${caixa.length}` : ""})
+          </span>
         </h2>
         <button
           onClick={() => setEditing("new")}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-sm font-bold text-background hover:bg-gold/90 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-card px-3 py-2 text-sm font-semibold text-gold hover:bg-gold-dim transition-colors"
         >
           <Plus className="h-4 w-4" /> Novo dia
         </button>
       </div>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por data (DD/MM) ou destino..."
+          className="w-full rounded-lg border border-border bg-surface pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+        />
+      </div>
+
 
       {editing !== null && (
         <CaixaForm
@@ -335,7 +409,7 @@ function CaixaManager() {
               </tr>
             </thead>
             <tbody>
-              {caixa.map((c) => (
+              {filtered.map((c) => (
                 <tr key={c.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
                   <td className="px-4 py-3 font-semibold text-foreground">{c.data}</td>
                   <td className="px-4 py-3 text-right text-soft-foreground">{brl(c.saldoAnterior)}</td>
@@ -355,8 +429,10 @@ function CaixaManager() {
                   </td>
                 </tr>
               ))}
-              {caixa.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum movimento cadastrado.</td></tr>
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  {caixa.length === 0 ? "Nenhum movimento cadastrado." : "Nenhum movimento para essa busca."}
+                </td></tr>
               )}
             </tbody>
           </table>
