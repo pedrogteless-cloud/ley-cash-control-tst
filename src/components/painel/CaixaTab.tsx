@@ -126,8 +126,8 @@ export function CaixaTab({
                 </tr>
               </thead>
               <tbody>
-                {caixa.map((c, i) => (
-                  <tr key={i} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
+                {caixa.map((c) => (
+                  <tr key={c.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
                     <td className="px-4 py-3 font-semibold text-foreground">{c.data}</td>
                     <td className="px-4 py-3 text-right text-soft-foreground">{brl(c.saldoAnterior)}</td>
                     <td className="px-4 py-3 text-right font-semibold text-blue">{c.entrada > 0 ? brl(c.entrada) : "—"}</td>
