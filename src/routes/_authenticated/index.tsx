@@ -62,8 +62,12 @@ function Painel() {
         <div className="flex items-start gap-3 rounded-xl border border-blue/30 bg-blue-dim/40 p-3 text-sm">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue" />
           <div className="text-soft-foreground">
-            Este é o <span className="font-semibold text-foreground">painel de análise</span>.
-            Os números aqui são apenas para leitura — para registrar NFs ou movimentos de caixa, acesse <span className="font-semibold text-gold">Lançamentos</span>.
+            <span className="font-semibold text-foreground">Esta tela é só para consultar.</span>{" "}
+            <span className="sm:hidden">Os números são para acompanhar. Para registrar algo novo, toque em </span>
+            <span className="hidden sm:inline">Os números aqui são apenas para leitura — para registrar NFs ou movimentos de caixa, acesse </span>
+            <span className="font-semibold text-gold">Lançamentos</span>
+            <span className="sm:hidden"> lá embaixo.</span>
+            <span className="hidden sm:inline">.</span>
           </div>
         </div>
 

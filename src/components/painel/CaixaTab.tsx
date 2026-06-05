@@ -43,10 +43,10 @@ export function CaixaTab({
   return (
     <div className="space-y-6">
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Saldo em Casa" value={brl(ultimo.saldoTotal)} hint={`Em ${ultimo.data}`} tone="green" icon={<Wallet className="h-4 w-4" />} />
-        <KpiCard label="Entrada do Dia" value={brl(ultimo.entrada)} hint="Cheques recebidos" tone="blue" icon={<ArrowDownToLine className="h-4 w-4" />} />
-        <KpiCard label="Saída do Dia" value={brl(ultimo.saida)} hint={ultimo.destino ?? "Sem saídas"} tone="red" icon={<ArrowUpFromLine className="h-4 w-4" />} />
-        <KpiCard label="Cobertura" value={`${cobertura.toFixed(0)}%`} hint={brl(totalCarteira) + " a pagar"} tone="gold" icon={<Shield className="h-4 w-4" />} />
+        <KpiCard label="Saldo em Casa" value={brl(ultimo.saldoTotal)} hint={`Em ${ultimo.data}`} explain="Quanto temos em cheques guardados hoje." tone="green" icon={<Wallet className="h-4 w-4" />} />
+        <KpiCard label="Entrada do Dia" value={brl(ultimo.entrada)} hint="Cheques recebidos" explain="O que entrou no caixa no último dia." tone="blue" icon={<ArrowDownToLine className="h-4 w-4" />} />
+        <KpiCard label="Saída do Dia" value={brl(ultimo.saida)} hint={ultimo.destino ?? "Sem saídas"} explain="O que saiu do caixa no último dia." tone="red" icon={<ArrowUpFromLine className="h-4 w-4" />} />
+        <KpiCard label="Cobertura" value={`${cobertura.toFixed(0)}%`} hint={brl(totalCarteira) + " a pagar"} explain="Quanto do que devemos já está em caixa." tone="gold" icon={<Shield className="h-4 w-4" />} />
       </div>
 
       {/* Charts - desktop só */}
