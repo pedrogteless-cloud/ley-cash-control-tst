@@ -125,10 +125,10 @@ function KpiBlock({
   tone: "default" | "green";
 }) {
   return (
-    <div className="min-w-[78%] snap-start rounded-xl border border-border bg-card/60 p-4 backdrop-blur sm:min-w-0">
+    <div className="min-w-[82%] snap-start rounded-xl border border-border bg-card/60 p-4 backdrop-blur sm:min-w-0">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div
-        className={`mt-1 text-2xl font-bold sm:text-3xl ${
+        className={`mt-1 truncate whitespace-nowrap tabular-nums leading-tight text-xl font-bold sm:text-3xl ${
           tone === "green" ? "text-green" : "text-foreground"
         }`}
       >
