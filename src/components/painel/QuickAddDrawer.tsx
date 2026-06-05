@@ -222,13 +222,17 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
           </select>
         </Field>
         <Field label="Entrega">
-          <input
+          <select
             value={entrega}
             onChange={(e) => setEntrega(e.target.value)}
-            maxLength={40}
             className={inputCls()}
-            placeholder="NÃO CHEGOU"
-          />
+          >
+            {["NÃO CHEGOU", "CHEGOU"].map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 
