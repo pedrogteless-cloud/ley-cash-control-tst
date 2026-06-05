@@ -52,7 +52,12 @@ export function AppHeader() {
             Painel de Controle
           </h1>
           <span className="rounded-full bg-gold-dim px-2.5 py-0.5 text-[11px] font-semibold text-gold ring-1 ring-gold/30">
-            {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date()).replace(" de ", " · ").replace(".", "")}
+            {(() => {
+              const d = new Date();
+              const dia = String(d.getDate()).padStart(2, "0");
+              const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "");
+              return `${dia} ${mes} · ${d.getFullYear()}`;
+            })()}
           </span>
           {isAdmin && (
             <span className="rounded-full bg-green-dim px-2.5 py-0.5 text-[11px] font-semibold text-green ring-1 ring-green/30">
