@@ -53,10 +53,9 @@ Deno.serve(async (req) => {
 
     if (table === "notas_fiscais") {
       const status = String(record.status_nf ?? "").toUpperCase();
-      const entrega = String(record.entrega ?? "").toUpperCase();
-      if (status === "CHEGOU" && entrega.includes("CHEGOU")) {
+      if (status === "CHEGOU") {
         const msg = [
-          "📬 <b>Cheque a Enviar</b>",
+          "📬 <b>NF chegou! Cheques a enviar...</b>",
           `🏭 <b>Fornecedor:</b> ${escapeHtml(record.fornecedor)}`,
           `🧾 <b>NF:</b> ${escapeHtml(record.nf)}`,
           `🏢 <b>Filial:</b> ${escapeHtml(record.filial)}`,
