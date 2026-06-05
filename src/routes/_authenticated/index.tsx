@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Info } from "lucide-react";
 import { AppHeader } from "@/components/painel/AppHeader";
 import { CarteiraTab } from "@/components/painel/CarteiraTab";
 import { CaixaTab } from "@/components/painel/CaixaTab";
 import { MobileTabBar } from "@/components/painel/MobileTabBar";
+import { useStore } from "@/data/store";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
