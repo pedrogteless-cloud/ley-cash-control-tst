@@ -85,10 +85,10 @@ export function CarteiraTab({
 
       {/* KPIs */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Cheque a Enviar" value={brl(totals.enviar.val)} hint={`${totals.enviar.qtd} notas`} tone="orange" icon={<Send className="h-4 w-4" />} />
-        <KpiCard label="Aguardando" value={brl(totals.aguardando.val)} hint={`${totals.aguardando.qtd} notas`} tone="blue" icon={<Clock className="h-4 w-4" />} />
-        <KpiCard label="Apenas Faturado" value={brl(totals.apenasFat.val)} hint={`${totals.apenasFat.qtd} notas`} tone="gold" icon={<FileText className="h-4 w-4" />} />
-        <KpiCard label="Total Carteira" value={brl(totals.total)} hint={`${notas.length} notas`} tone="green" icon={<Wallet className="h-4 w-4" />} />
+        <KpiCard label="Cheque a Enviar" value={brl(totals.enviar.val)} hint={`${totals.enviar.qtd} notas`} explain="Cheques prontos para mandar ao fornecedor." tone="orange" icon={<Send className="h-4 w-4" />} />
+        <KpiCard label="Aguardando" value={brl(totals.aguardando.val)} hint={`${totals.aguardando.qtd} notas`} explain="Mercadoria ainda não chegou." tone="blue" icon={<Clock className="h-4 w-4" />} />
+        <KpiCard label="Apenas Faturado" value={brl(totals.apenasFat.val)} hint={`${totals.apenasFat.qtd} notas`} explain="Nota emitida, esperando próximo passo." tone="gold" icon={<FileText className="h-4 w-4" />} />
+        <KpiCard label="Total Carteira" value={brl(totals.total)} hint={`${notas.length} notas`} explain="Soma de tudo que ainda está em aberto." tone="green" icon={<Wallet className="h-4 w-4" />} />
       </div>
 
       {/* Charts - desktop só */}
