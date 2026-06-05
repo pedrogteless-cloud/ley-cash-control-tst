@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { AlertTriangle, Send, Clock, FileText, Wallet, Search } from "lucide-react";
-import { isEnviar } from "@/data/painel";
+import { isEnviar, isAguardando } from "@/data/painel";
 import { useStore } from "@/data/store";
 import { brl } from "@/lib/format";
 import { KpiCard } from "./KpiCard";
