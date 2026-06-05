@@ -1,20 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, ArrowLeft } from "lucide-react";
-import { CarteiraTab } from "@/components/painel/CarteiraTab";
-import { CaixaTab } from "@/components/painel/CaixaTab";
-import { MobileTabBar } from "@/components/painel/MobileTabBar";
+import { Plus, ArrowLeft, LogOut, Pencil, Trash2, Inbox } from "lucide-react";
 import { QuickAddDrawer } from "@/components/painel/QuickAddDrawer";
-import { useStore } from "@/data/store";
+import { useStore, type NFRecord, type CaixaRecord } from "@/data/store";
 import { useRoles } from "@/hooks/use-role";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut } from "lucide-react";
+import { brl } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/lancamentos")({
   head: () => ({
     meta: [
-      { title: "Lançamentos · Grupo Ley" },
-      { name: "description", content: "Registrar e editar notas fiscais e movimentos de caixa." },
+      { title: "Lançar · Grupo Ley" },
+      { name: "description", content: "Entrada rápida de notas fiscais e movimentos de caixa do dia." },
     ],
   }),
   component: Lancamentos,
@@ -27,18 +24,38 @@ type DrawerMode =
   | { kind: "edit-nf"; id: string }
   | { kind: "edit-caixa"; id: string };
 
+function startOfTodayMs() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function isToday(iso?: string) {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) && t >= startOfTodayMs();
+}
+
 function Lancamentos() {
   const [tab, setTab] = useState<Tab>("carteira");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
-  const { notas, caixa } = useStore();
+  const { notas, caixa, removeNota, removeCaixa } = useStore();
   const { canWrite, canWriteNf, canWriteCaixa, loading } = useRoles();
   const navigate = useNavigate();
 
-  // Redireciona quem não tem permissão de lançar
   if (!loading && !canWrite) {
     navigate({ to: "/", replace: true });
   }
+
+  const nfsHoje = useMemo(
+    () => notas.filter((n) => isToday(n.createdAt)).sort(byCreatedDesc),
+    [notas]
+  );
+  const caixaHoje = useMemo(
+    () => caixa.filter((c) => isToday(c.createdAt)).sort(byCreatedDesc),
+    [caixa]
+  );
 
   const resolvedMode = useMemo(() => {
     if (!drawerMode) return null;
@@ -52,8 +69,12 @@ function Lancamentos() {
     return c ? { kind: "edit-caixa" as const, caixa: c } : null;
   }, [drawerMode, notas, caixa]);
 
+  const showCarteira = canWriteNf;
+  const showCaixa = canWriteCaixa;
+  const activeTab: Tab = showCarteira && (tab === "carteira" || !showCaixa) ? "carteira" : "caixa";
+
   const openFab = () => {
-    setDrawerMode(tab === "carteira" ? { kind: "new-nf" } : { kind: "new-caixa" });
+    setDrawerMode(activeTab === "carteira" ? { kind: "new-nf" } : { kind: "new-caixa" });
     setDrawerOpen(true);
   };
 
@@ -62,13 +83,8 @@ function Lancamentos() {
     setDrawerOpen(true);
   };
 
-  // Tabs disponíveis dependem da permissão do usuário
-  const showCarteira = canWriteNf;
-  const showCaixa = canWriteCaixa;
-  const activeTab: Tab = showCarteira && (tab === "carteira" || !showCaixa) ? "carteira" : "caixa";
-
   return (
-    <div className="min-h-screen bg-background pb-20 sm:pb-0">
+    <div className="min-h-screen bg-background pb-24 sm:pb-0">
       <header className="header-gradient sticky top-0 z-40 border-b border-border">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center justify-between gap-3">
@@ -79,7 +95,7 @@ function Lancamentos() {
               <ArrowLeft className="h-3.5 w-3.5" /> Painel
             </Link>
             <div className="text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">
-              ◆ Lançamentos
+              ◆ Lançar
             </div>
             <button
               onClick={() => supabase.auth.signOut()}
@@ -92,13 +108,8 @@ function Lancamentos() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-bold text-foreground sm:text-2xl">Lançamentos</h1>
-              <p className="text-xs text-soft-foreground sm:text-sm">
-                Registre novas notas e movimentos de caixa.
-              </p>
-            </div>
-            <TodayCounter notas={notas} caixa={caixa} />
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">Lançamentos de hoje</h1>
+            <TodayCounter nfs={nfsHoje.length} cx={caixaHoje.length} />
           </div>
 
           <div className="mt-4 inline-flex rounded-xl border border-border bg-surface p-1">
@@ -128,21 +139,41 @@ function Lancamentos() {
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         {activeTab === "carteira" ? (
-          <CarteiraTab onEdit={(_k, id) => onEdit("nf", id)} />
+          <TodayList
+            items={nfsHoje}
+            empty="Nenhuma NF lançada hoje ainda. Toque em + para começar."
+            renderItem={(n) => (
+              <NfRow
+                key={n.id}
+                n={n}
+                onEdit={() => onEdit("nf", n.id)}
+                onDelete={() => removeNota(n.id)}
+              />
+            )}
+          />
         ) : (
-          <CaixaTab onEdit={(_k, id) => onEdit("caixa", id)} />
+          <TodayList
+            items={caixaHoje}
+            empty="Nenhum movimento de caixa hoje ainda. Toque em + para começar."
+            renderItem={(c) => (
+              <CaixaRow
+                key={c.id}
+                c={c}
+                onEdit={() => onEdit("caixa", c.id)}
+                onDelete={() => removeCaixa(c.id)}
+              />
+            )}
+          />
         )}
       </main>
 
       <button
         onClick={openFab}
-        className="fixed bottom-20 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gold text-background shadow-lg shadow-gold/30 hover:bg-gold/90 sm:bottom-6 sm:right-6"
+        className="fixed bottom-6 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gold text-background shadow-lg shadow-gold/30 hover:bg-gold/90 sm:right-6"
         aria-label="Novo lançamento"
       >
         <Plus className="h-6 w-6" />
       </button>
-
-      <MobileTabBar activeTab={activeTab} onChangeTab={setTab} />
 
       <QuickAddDrawer
         open={drawerOpen}
@@ -157,41 +188,130 @@ function Lancamentos() {
   );
 }
 
-function TodayCounter({
-  notas,
-  caixa,
-}: {
-  notas: { createdAt?: string }[];
-  caixa: { createdAt?: string }[];
-}) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const startMs = startOfDay.getTime();
+function byCreatedDesc(a: { createdAt?: string }, b: { createdAt?: string }) {
+  const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  return tb - ta;
+}
 
-  const isToday = (iso?: string) => {
-    if (!iso) return false;
-    const t = new Date(iso).getTime();
-    return Number.isFinite(t) && t >= startMs;
-  };
-
-  const nfHoje = notas.filter((n) => isToday(n.createdAt)).length;
-  const caixaHoje = caixa.filter((c) => isToday(c.createdAt)).length;
-
-  if (nfHoje === 0 && caixaHoje === 0) {
+function TodayCounter({ nfs, cx }: { nfs: number; cx: number }) {
+  if (nfs === 0 && cx === 0) {
     return (
       <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-soft-foreground">
         Nenhum lançamento hoje ainda.
       </div>
     );
   }
-
   return (
     <div className="rounded-lg border border-gold/30 bg-gold-dim px-3 py-2 text-xs">
       <span className="font-semibold text-gold">Hoje:</span>{" "}
       <span className="text-foreground">
-        {nfHoje} NF{nfHoje === 1 ? "" : "s"} · {caixaHoje} mov. de caixa
+        {nfs} NF{nfs === 1 ? "" : "s"} · {cx} mov. de caixa
       </span>
     </div>
   );
 }
 
+function TodayList<T>({
+  items,
+  empty,
+  renderItem,
+}: {
+  items: T[];
+  empty: string;
+  renderItem: (item: T) => React.ReactNode;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/40 px-4 py-16 text-center">
+        <Inbox className="h-10 w-10 text-muted-foreground" />
+        <p className="max-w-xs text-sm text-soft-foreground">{empty}</p>
+      </div>
+    );
+  }
+  return <div className="space-y-2">{items.map(renderItem)}</div>;
+}
+
+function timeLabel(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function NfRow({
+  n,
+  onEdit,
+  onDelete,
+}: {
+  n: NFRecord;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <span>{timeLabel(n.createdAt)}</span>
+          <span>·</span>
+          <span>{n.filial}</span>
+          <span>·</span>
+          <span>NF {n.nf}</span>
+        </div>
+        <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{n.fornecedor}</div>
+      </div>
+      <div className="text-right">
+        <div className="text-sm font-bold text-foreground">{brl(n.valor)}</div>
+        <div className="mt-1 flex justify-end gap-1">
+          <button onClick={onEdit} className="rounded-md p-1.5 text-blue hover:bg-blue-dim" aria-label="Editar">
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button onClick={onDelete} className="rounded-md p-1.5 text-red hover:bg-red-dim" aria-label="Excluir">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CaixaRow({
+  c,
+  onEdit,
+  onDelete,
+}: {
+  c: CaixaRecord;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const tipo =
+    c.entrada > 0 && c.saida === 0 ? "Entrada" : c.saida > 0 && c.entrada === 0 ? "Saída" : "Movimento";
+  const valor = c.entrada > 0 ? c.entrada : c.saida;
+  const tone = c.entrada > 0 ? "text-blue" : "text-red";
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <span>{timeLabel(c.createdAt)}</span>
+          <span>·</span>
+          <span>{c.data}</span>
+          <span>·</span>
+          <span>{tipo}</span>
+        </div>
+        <div className="mt-0.5 truncate text-sm font-semibold text-foreground">
+          {c.destino?.trim() || "—"}
+        </div>
+      </div>
+      <div className="text-right">
+        <div className={`text-sm font-bold ${tone}`}>{brl(valor)}</div>
+        <div className="mt-1 flex justify-end gap-1">
+          <button onClick={onEdit} className="rounded-md p-1.5 text-blue hover:bg-blue-dim" aria-label="Editar">
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button onClick={onDelete} className="rounded-md p-1.5 text-red hover:bg-red-dim" aria-label="Excluir">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
