@@ -14,6 +14,7 @@ type NfRow = {
   valor: number | string;
   status_nf: string;
   entrega: string;
+  created_at?: string;
 };
 
 type CaixaRow = {
@@ -24,6 +25,7 @@ type CaixaRow = {
   saida: number | string;
   saldo_total: number | string;
   destino: string | null;
+  created_at?: string;
 };
 
 const toNum = (v: number | string) => (typeof v === "number" ? v : Number(v));
@@ -36,16 +38,18 @@ const mapNf = (r: NfRow): NFRecord => ({
   valor: toNum(r.valor),
   statusNf: r.status_nf,
   entrega: r.entrega,
+  createdAt: r.created_at,
 });
 
 const mapCaixa = (r: CaixaRow): CaixaRecord => ({
   id: r.id,
   data: r.data,
-  saldoAnterior: toNum(r.saldo_anterior),
+  saldoAnterior: toNum(r.saldoAnterior as never) || toNum(r.saldo_anterior),
   entrada: toNum(r.entrada),
   saida: toNum(r.saida),
   saldoTotal: toNum(r.saldo_total),
   destino: r.destino ?? undefined,
+  createdAt: r.created_at,
 });
 
 const QK = {
