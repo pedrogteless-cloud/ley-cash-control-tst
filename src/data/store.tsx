@@ -77,7 +77,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("caixa_movimentos")
-        .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino")
+        .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino, created_at")
         .order("data", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
