@@ -203,9 +203,21 @@ export function useStore() {
       const { error } = await supabase.from("caixa_movimentos").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_d, id) => {
+      const removed = (caixaQ.data ?? []).find((c) => c.id === id);
       invalidateCaixa();
-      toast.success("Movimento removido");
+      toast.success("Movimento removido", {
+        action: removed
+          ? {
+              label: "Desfazer",
+              onClick: () => {
+                const { id: _omit, createdAt: _c, ...rest } = removed;
+                addCaixaM.mutate(rest);
+              },
+            }
+          : undefined,
+        duration: 6000,
+      });
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
