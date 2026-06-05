@@ -56,9 +56,7 @@ export function AppHeader() {
               const d = new Date();
               const dia = String(d.getDate()).padStart(2, "0");
               const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "");
-              const hh = String(d.getHours()).padStart(2, "0");
-              const mm = String(d.getMinutes()).padStart(2, "0");
-              return `${dia} ${mes} · ${d.getFullYear()} · ${hh}:${mm}`;
+              return `${dia} ${mes} · ${d.getFullYear()}`;
             })()}
           </span>
           {(() => {
