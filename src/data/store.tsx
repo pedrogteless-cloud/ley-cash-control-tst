@@ -90,7 +90,7 @@ export function useStore() {
 
   const addNotaM = useMutation({
     mutationFn: async (n: Omit<NFRecord, "id">) => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: s } = await supabase.auth.getSession();
       const { error } = await supabase.from("notas_fiscais").insert({
         fornecedor: n.fornecedor,
         nf: n.nf,
@@ -98,7 +98,7 @@ export function useStore() {
         valor: n.valor,
         status_nf: n.statusNf,
         entrega: n.entrega,
-        criado_por: u.user?.id ?? null,
+        criado_por: s.session?.user.id ?? null,
       });
       if (error) throw error;
     },
