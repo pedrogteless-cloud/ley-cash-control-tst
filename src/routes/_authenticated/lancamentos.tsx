@@ -156,3 +156,42 @@ function Lancamentos() {
     </div>
   );
 }
+
+function TodayCounter({
+  notas,
+  caixa,
+}: {
+  notas: { createdAt?: string }[];
+  caixa: { createdAt?: string }[];
+}) {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const startMs = startOfDay.getTime();
+
+  const isToday = (iso?: string) => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return Number.isFinite(t) && t >= startMs;
+  };
+
+  const nfHoje = notas.filter((n) => isToday(n.createdAt)).length;
+  const caixaHoje = caixa.filter((c) => isToday(c.createdAt)).length;
+
+  if (nfHoje === 0 && caixaHoje === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-soft-foreground">
+        Nenhum lançamento hoje ainda.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-gold/30 bg-gold-dim px-3 py-2 text-xs">
+      <span className="font-semibold text-gold">Hoje:</span>{" "}
+      <span className="text-foreground">
+        {nfHoje} NF{nfHoje === 1 ? "" : "s"} · {caixaHoje} mov. de caixa
+      </span>
+    </div>
+  );
+}
+
