@@ -136,9 +136,21 @@ export function useStore() {
       const { error } = await supabase.from("notas_fiscais").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_d, id) => {
+      const removed = (notasQ.data ?? []).find((n) => n.id === id);
       invalidateNotas();
-      toast.success("Nota fiscal removida");
+      toast.success("Nota fiscal removida", {
+        action: removed
+          ? {
+              label: "Desfazer",
+              onClick: () => {
+                const { id: _omit, createdAt: _c, ...rest } = removed;
+                addNotaM.mutate(rest);
+              },
+            }
+          : undefined,
+        duration: 6000,
+      });
     },
     onError: (e: Error) => toast.error(`Erro ao remover: ${e.message}`),
   });
