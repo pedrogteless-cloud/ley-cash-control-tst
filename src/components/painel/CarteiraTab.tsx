@@ -31,8 +31,8 @@ export function CarteiraTab({
 
   const totals = useMemo(() => {
     const enviar = notas.filter(isEnviar);
-    const aguardando = notas.filter((n) => n.entrega.toUpperCase().includes("NÃO") && n.statusNf.toUpperCase() === "FATURADO");
-    const apenasFat = notas.filter((n) => !isEnviar(n) && !(n.entrega.toUpperCase().includes("NÃO") && n.statusNf.toUpperCase() === "FATURADO"));
+    const aguardando = notas.filter(isAguardando);
+    const apenasFat = notas.filter((n) => !isEnviar(n) && !isAguardando(n));
     const sum = (arr: typeof notas) => arr.reduce((s, n) => s + n.valor, 0);
     const total = sum(notas);
     return {
