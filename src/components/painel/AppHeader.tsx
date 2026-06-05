@@ -56,7 +56,9 @@ export function AppHeader() {
               const d = new Date();
               const dia = String(d.getDate()).padStart(2, "0");
               const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "");
-              return `${dia} ${mes} · ${d.getFullYear()}`;
+              const hh = String(d.getHours()).padStart(2, "0");
+              const mm = String(d.getMinutes()).padStart(2, "0");
+              return `${dia} ${mes} · ${d.getFullYear()} · ${hh}:${mm}`;
             })()}
           </span>
           {(() => {
@@ -71,9 +73,11 @@ export function AppHeader() {
             const d = new Date(Math.max(...valid));
             const dia = String(d.getDate()).padStart(2, "0");
             const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "");
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mm = String(d.getMinutes()).padStart(2, "0");
             return (
               <span className="rounded-full bg-blue-dim px-2.5 py-0.5 text-[11px] font-semibold text-blue ring-1 ring-blue/30">
-                Última atualização · {dia} {mes} · {d.getFullYear()}
+                Última atualização · {dia} {mes} · {d.getFullYear()} · {hh}:{mm}
               </span>
             );
           })()}
