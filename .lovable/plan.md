@@ -1,42 +1,53 @@
-## Objetivo
-Deixar o app pronto pra você mostrar pro time **hoje**, com dados que parecem reais e logins por papel funcionando.
+## Diagnóstico
 
-## Estratégia (3 passos)
+Hoje o `/` mistura dois papéis: análise (KPIs, gráficos) e operação (FAB "+", botões editar/excluir nos cards). Você quer que o **Painel seja só leitura/explicativo** e que o **trabalho do dia-a-dia dos lançadores** ganhe uma área própria, mais rápida e mobile-first.
 
-### 1. Seed de dados realistas (eu faço via migration)
-Insiro direto no banco ~25 NFs e ~10 dias de caixa com fornecedores plausíveis do varejo/distribuição (BR), valores variados, status misturados (FATURADO/CHEGOU, ENVIAR/NÃO CHEGOU) pra demo ter:
-- Alertas laranja ("X NFs com cheque a enviar")
-- Carteira distribuída entre fornecedores (gráficos populam)
-- Saldo de caixa com cobertura ~70-90% (KPI verde faz sentido)
-- Histórico de caixa pra ver evolução
+## Plano em 4 entregas
 
-Você pode editar/remover tudo depois pelo próprio painel.
+### Entrega 1 — Separar Painel de Lançamentos (núcleo do pedido)
 
-### 2. Publicar o app
-Clico em Publish → gera URL `cheque-flow.lovable.app` (ou similar). A partir daí o time acessa de qualquer lugar (celular, desktop).
+**Painel (`/`) vira somente análise:**
+- Remove FAB "+", remove botões editar/excluir dos cards
+- Adiciona "modo explicativo": tooltips nos KPIs ("o que é cobertura?", "como ler este gráfico"), legendas curtas em cada bloco, e um banner-resumo no topo ("Hoje você tem X NFs a vencer, cobertura Y%, atenção em Z fornecedores")
+- Diretoria/admin/lançadores: todos veem igual aqui
+- Mantém tudo que já existe de visual, só tira ação
 
-### 3. Criar usuários do time
-Pra cada pessoa, eu te passo o passo-a-passo (3 cliques):
-- **Você (admin)**: cria sua conta no `/auth`, eu te dou role admin via migration
-- **Lançador NF**: pessoa cria conta, você atribui role pelo `/gerenciar` (vou adicionar uma aba "Usuários" rápida pra você gerenciar roles sem SQL)
-- **Lançador Caixa**: idem
-- **Diretoria**: idem (só leitura, sem FAB nem botões editar)
+**Nova área `/lancamentos`** (visível só pra quem tem role de lançador ou admin):
+- Lista enxuta focada em velocidade: busca, filtros (status, fornecedor, período), edição/exclusão, FAB "+"
+- Duas abas internas: "Notas Fiscais" e "Caixa"
+- Atalhos de teclado básicos (novo lançamento, salvar) no desktop
+- Card otimizado pra toque no mobile (swipe pra editar/excluir, confirmação inline)
 
-## O que vou construir
+**MobileTabBar** ganha 3 ícones: Painel · Lançamentos · Gerenciar (admin)
 
-| Arquivo | Mudança |
-|---|---|
-| `supabase/migrations/*_seed_demo.sql` | INSERT de 25 NFs + 10 dias de caixa + sua conta admin (você me passa o email) |
-| `src/routes/_authenticated/gerenciar.tsx` | Nova aba "Time": lista usuários do `profiles`, dropdown pra atribuir/remover roles (admin/lancador_nf/lancador_caixa/diretoria) |
-| `src/lib/api/roles.functions.ts` | Server functions `assignRole` / `removeRole` (só admin pode chamar, via `requireSupabaseAuth` + check `has_role`) |
+### Entrega 2 — UX dos lançadores (a dor real)
 
-## Out of scope (deixar pra depois)
-- Exportar Excel/PDF (Entrega 3)
-- Alertas por email (Entrega 3)
-- Reset de senha por email (já funciona nativo pelo Supabase)
+- **Lançamento mais rápido**: drawer já abre com data de hoje, último fornecedor usado em sugestão, máscara de valor BR sem precisar digitar vírgula
+- **Confirmação visual forte**: toast com botão "Desfazer" por 5s em vez de só "salvo"
+- **Validação inline** no drawer (NF duplicada, valor zerado, data futura) antes de salvar
+- **Histórico do dia** no topo da tela de lançamentos: "Hoje você lançou X NFs / Y movimentos" — sensação de progresso
 
-## O que eu preciso de você
-**1 informação só:** seu email (o que você vai usar pra logar como admin). Pode me responder agora ou quando aprovar o plano.
+### Entrega 3 — Segurança e robustez
 
-## Tempo estimado
-~10 min implementando + 5 min você publicar e criar contas do time. **Pronto pra demo em 15 min.**
+- Fix dos 2 findings pendentes (RLS de `profiles` e `user_roles`) — 1 migration, zero impacto no código
+- **Log de auditoria**: tabela `audit_log` que grava quem criou/editou/removeu cada NF e movimento de caixa (admin vê em `/gerenciar`)
+- **Soft delete** opcional: em vez de DELETE direto, marca `removido_em` — permite "lixeira" e recuperação
+- Validação server-side com Zod nos `createServerFn` (hoje só validamos no client)
+
+### Entrega 4 — Performance e qualidade
+
+- Paginação/virtualização na lista de NFs (hoje carrega tudo de uma vez — vai pesar com 500+ notas)
+- Cache mais agressivo no React Query (staleTime maior pra dados que mudam pouco)
+- Skeleton loaders em vez de tela em branco durante carregamento
+- Pequenas correções de acessibilidade (contraste, foco visível, labels em botões-ícone)
+
+## Out of scope (deixa pra depois se quiser)
+
+- Exportar Excel/PDF
+- Alertas por email/WhatsApp
+- Dashboard exclusivo da diretoria com gráficos diferentes
+- PWA / instalação no celular
+
+## Próximo passo
+
+Me diz quais entregas você quer e em que ordem. Sugestão: **começar pela Entrega 1** (resolve o pedido direto), depois Entrega 2 (impacto imediato pro time), e Segurança quando estiver confortável (precisa de 1 migration que eu já te mostrei antes).
