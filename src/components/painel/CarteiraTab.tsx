@@ -17,11 +17,14 @@ type Filter = (typeof FILTERS)[number];
 
 export function CarteiraTab({
   onEdit,
+  readOnly = false,
 }: {
   onEdit?: (kind: "nf", id: string) => void;
+  readOnly?: boolean;
 }) {
   const { notas, removeNota } = useStore();
   const { canWriteNf } = useRoles();
+  const canEdit = !readOnly && canWriteNf;
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState<Filter>("Todas");
   const [search, setSearch] = useState("");
