@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.notify_telegram() FROM PUBLIC, anon, authenticated;
