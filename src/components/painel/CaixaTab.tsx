@@ -106,7 +106,7 @@ export function CaixaTab({
               c={c}
               canWrite={canEdit}
               onEdit={() => onEdit?.("caixa", c.id)}
-              onDelete={() => confirm(`Remover dia ${c.data}?`) && removeCaixa(c.id)}
+              onDelete={() => removeCaixa(c.id)}
             />
           ))}
         </div>

@@ -155,7 +155,7 @@ export function CarteiraTab({
               n={n}
               canWrite={canEdit}
               onEdit={() => onEdit?.("nf", n.id)}
-              onDelete={() => confirm(`Remover NF ${n.nf}?`) && removeNota(n.id)}
+              onDelete={() => removeNota(n.id)}
             />
           ))}
           {filtered.length === 0 && (

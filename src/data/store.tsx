@@ -3,8 +3,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NF, CaixaDia } from "@/data/painel";
 
-export type NFRecord = NF & { id: string };
-export type CaixaRecord = CaixaDia & { id: string };
+export type NFRecord = NF & { id: string; createdAt?: string };
+export type CaixaRecord = CaixaDia & { id: string; createdAt?: string };
 
 type NfRow = {
   id: string;
@@ -14,6 +14,7 @@ type NfRow = {
   valor: number | string;
   status_nf: string;
   entrega: string;
+  created_at?: string;
 };
 
 type CaixaRow = {
@@ -24,6 +25,7 @@ type CaixaRow = {
   saida: number | string;
   saldo_total: number | string;
   destino: string | null;
+  created_at?: string;
 };
 
 const toNum = (v: number | string) => (typeof v === "number" ? v : Number(v));
@@ -36,6 +38,7 @@ const mapNf = (r: NfRow): NFRecord => ({
   valor: toNum(r.valor),
   statusNf: r.status_nf,
   entrega: r.entrega,
+  createdAt: r.created_at,
 });
 
 const mapCaixa = (r: CaixaRow): CaixaRecord => ({
@@ -46,6 +49,7 @@ const mapCaixa = (r: CaixaRow): CaixaRecord => ({
   saida: toNum(r.saida),
   saldoTotal: toNum(r.saldo_total),
   destino: r.destino ?? undefined,
+  createdAt: r.created_at,
 });
 
 const QK = {
@@ -61,7 +65,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notas_fiscais")
-        .select("id, fornecedor, nf, filial, valor, status_nf, entrega")
+        .select("id, fornecedor, nf, filial, valor, status_nf, entrega, created_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as NfRow[]).map(mapNf);
@@ -73,7 +77,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("caixa_movimentos")
-        .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino")
+        .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino, created_at")
         .order("data", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -132,9 +136,21 @@ export function useStore() {
       const { error } = await supabase.from("notas_fiscais").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_d, id) => {
+      const removed = (notasQ.data ?? []).find((n) => n.id === id);
       invalidateNotas();
-      toast.success("Nota fiscal removida");
+      toast.success("Nota fiscal removida", {
+        action: removed
+          ? {
+              label: "Desfazer",
+              onClick: () => {
+                const { id: _omit, createdAt: _c, ...rest } = removed;
+                addNotaM.mutate(rest);
+              },
+            }
+          : undefined,
+        duration: 6000,
+      });
     },
     onError: (e: Error) => toast.error(`Erro ao remover: ${e.message}`),
   });
@@ -187,9 +203,21 @@ export function useStore() {
       const { error } = await supabase.from("caixa_movimentos").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_d, id) => {
+      const removed = (caixaQ.data ?? []).find((c) => c.id === id);
       invalidateCaixa();
-      toast.success("Movimento removido");
+      toast.success("Movimento removido", {
+        action: removed
+          ? {
+              label: "Desfazer",
+              onClick: () => {
+                const { id: _omit, createdAt: _c, ...rest } = removed;
+                addCaixaM.mutate(rest);
+              },
+            }
+          : undefined,
+        duration: 6000,
+      });
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
