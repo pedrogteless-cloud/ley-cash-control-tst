@@ -90,6 +90,26 @@ const emptyNota = {
 function NotasManager() {
   const { notas, addNota, updateNota, removeNota } = useStore();
   const [editing, setEditing] = useState<NFRecord | "new" | null>(null);
+  const [search, setSearch] = useState("");
+  const [filial, setFilial] = useState<string>("Todas");
+
+  const filiais = useMemo(() => {
+    const s = new Set<string>();
+    notas.forEach((n) => n.filial && s.add(n.filial));
+    return ["Todas", ...Array.from(s).sort()];
+  }, [notas]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return notas.filter((n) => {
+      if (filial !== "Todas" && n.filial !== filial) return false;
+      if (!q) return true;
+      return (
+        n.fornecedor.toLowerCase().includes(q) ||
+        n.nf.toLowerCase().includes(q)
+      );
+    });
+  }, [notas, search, filial]);
 
   const initial = editing === "new" || editing === null ? emptyNota : editing;
 
@@ -103,15 +123,43 @@ function NotasManager() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-foreground">
-          Notas fiscais <span className="text-muted-foreground">({notas.length})</span>
+          Notas fiscais{" "}
+          <span className="text-muted-foreground">
+            ({filtered.length}
+            {filtered.length !== notas.length ? ` de ${notas.length}` : ""})
+          </span>
         </h2>
         <button
           onClick={() => setEditing("new")}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-sm font-bold text-background hover:bg-gold/90 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-card px-3 py-2 text-sm font-semibold text-gold hover:bg-gold-dim transition-colors"
         >
           <Plus className="h-4 w-4" /> Nova NF
         </button>
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar fornecedor ou nº NF..."
+            className="w-full rounded-lg border border-border bg-surface pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+          />
+        </div>
+        <select
+          value={filial}
+          onChange={(e) => setFilial(e.target.value)}
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+        >
+          {filiais.map((f) => (
+            <option key={f} value={f}>
+              Filial: {f}
+            </option>
+          ))}
+        </select>
+      </div>
+
 
       {editing !== null && (
         <NotaForm
