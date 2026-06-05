@@ -180,10 +180,10 @@ export function CarteiraTab({
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((n, i) => {
+                {filtered.map((n) => {
                   const enviar = isEnviar(n);
                   return (
-                    <tr key={i} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
+                    <tr key={n.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
                       <td className="px-4 py-3 font-medium text-foreground">{n.fornecedor}</td>
                       <td className="px-4 py-3 text-soft-foreground">{n.nf}</td>
                       <td className="px-4 py-3 text-muted-foreground">{n.filial}</td>
