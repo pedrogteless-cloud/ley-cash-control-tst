@@ -72,7 +72,7 @@ function Painel() {
 
       <footer className="border-t border-border bg-surface mb-16 sm:mb-0">
         <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-gold sm:px-6">
-          Atualizado em 01 de junho de 2026
+          Atualizado em {atualizadoEm}
         </div>
       </footer>
 
