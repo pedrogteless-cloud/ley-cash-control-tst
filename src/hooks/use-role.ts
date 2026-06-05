@@ -7,12 +7,12 @@ export function useRoles() {
   const q = useQuery({
     queryKey: ["my-roles"],
     queryFn: async (): Promise<AppRole[]> => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.user) return [];
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", u.user.id);
+        .eq("user_id", s.session.user.id);
       if (error) throw error;
       return (data ?? []).map((r) => r.role as AppRole);
     },
