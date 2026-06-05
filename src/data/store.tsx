@@ -3,8 +3,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NF, CaixaDia } from "@/data/painel";
 
-export type NFRecord = NF & { id: string };
-export type CaixaRecord = CaixaDia & { id: string };
+export type NFRecord = NF & { id: string; createdAt?: string };
+export type CaixaRecord = CaixaDia & { id: string; createdAt?: string };
 
 type NfRow = {
   id: string;
