@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
 
     if (table === "notas_fiscais") {
       const status = String(record.status_nf ?? "").toUpperCase();
+      const op = String(payload.type ?? "").toUpperCase();
       if (status === "CHEGOU") {
         const msg = [
           "📬 <b>NF chegou! Cheques a enviar...</b>",
@@ -62,6 +63,15 @@ Deno.serve(async (req) => {
           `💰 <b>Valor:</b> ${escapeHtml(brl(record.valor))}`,
           "",
           "⚠️ <i>Separe os cheques e envie ao fornecedor.</i>",
+        ].join("\n");
+        await sendTelegram(msg);
+      } else if (op === "INSERT" && status === "FATURADO") {
+        const msg = [
+          "🚚 <b>Nova NF faturada, carga a caminho!</b>",
+          `🏭 <b>Fornecedor:</b> ${escapeHtml(record.fornecedor)}`,
+          `🧾 <b>NF:</b> ${escapeHtml(record.nf)}`,
+          `🏢 <b>Filial:</b> ${escapeHtml(record.filial)}`,
+          `💰 <b>Valor:</b> ${escapeHtml(brl(record.valor))}`,
         ].join("\n");
         await sendTelegram(msg);
       }
