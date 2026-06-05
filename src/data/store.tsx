@@ -65,7 +65,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notas_fiscais")
-        .select("id, fornecedor, nf, filial, valor, status_nf, entrega")
+        .select("id, fornecedor, nf, filial, valor, status_nf, entrega, created_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as NfRow[]).map(mapNf);
