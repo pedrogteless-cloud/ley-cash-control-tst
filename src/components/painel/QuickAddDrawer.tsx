@@ -192,21 +192,6 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
         </Field>
       </div>
 
-        <Field label="Filial">
-          <select
-            value={filial}
-            onChange={(e) => setFilial(e.target.value)}
-            className={inputCls()}
-          >
-            {["MATRIZ", "FILIAL", "CARGA", "—"].map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
       <Field label="Valor (R$)" error={errors.valor}>
         <input
           value={valorStr}
