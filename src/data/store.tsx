@@ -157,7 +157,7 @@ export function useStore() {
 
   const addCaixaM = useMutation({
     mutationFn: async (c: Omit<CaixaRecord, "id">) => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: s } = await supabase.auth.getSession();
       const { error } = await supabase.from("caixa_movimentos").insert({
         data: c.data,
         saldo_anterior: c.saldoAnterior,
@@ -165,7 +165,7 @@ export function useStore() {
         saida: c.saida,
         saldo_total: c.saldoTotal,
         destino: c.destino ?? null,
-        criado_por: u.user?.id ?? null,
+        criado_por: s.session?.user.id ?? null,
       });
       if (error) throw error;
     },
