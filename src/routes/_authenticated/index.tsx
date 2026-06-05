@@ -21,6 +21,19 @@ type Tab = "carteira" | "caixa";
 
 function Painel() {
   const [tab, setTab] = useState<Tab>("carteira");
+  const { notas, caixa } = useStore();
+
+  const atualizadoEm = useMemo(() => {
+    const times: number[] = [];
+    notas.forEach((n) => n.createdAt && times.push(new Date(n.createdAt).getTime()));
+    caixa.forEach((c) => {
+      if (c.createdAt) times.push(new Date(c.createdAt).getTime());
+      if (c.data) times.push(new Date(c.data).getTime());
+    });
+    const valid = times.filter((t) => Number.isFinite(t));
+    const d = valid.length ? new Date(Math.max(...valid)) : new Date();
+    return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(d);
+  }, [notas, caixa]);
 
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
