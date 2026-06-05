@@ -14,12 +14,15 @@ export function KpiCard({
   label,
   value,
   hint,
+  explain,
   tone = "gold",
   icon,
 }: {
   label: string;
   value: string;
   hint?: string;
+  /** Frase curta em linguagem simples — aparece só no mobile, para ajudar quem é pouco digital */
+  explain?: string;
   tone?: Tone;
   icon?: ReactNode;
 }) {
@@ -34,6 +37,11 @@ export function KpiCard({
       </div>
       <div className={`mt-2 text-xl font-bold sm:text-2xl ${t.fg}`}>{value}</div>
       {hint && <div className="mt-1 text-xs text-soft-foreground">{hint}</div>}
+      {explain && (
+        <div className="mt-1.5 text-[11px] leading-snug text-muted-foreground sm:hidden">
+          {explain}
+        </div>
+      )}
     </div>
   );
 }
