@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedLancamentosRouteImport } from './routes/_authenticated/lancamentos'
 import { Route as AuthenticatedGerenciarRouteImport } from './routes/_authenticated/gerenciar'
 
 const AuthRoute = AuthRouteImport.update({
@@ -28,6 +29,12 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLancamentosRoute =
+  AuthenticatedLancamentosRouteImport.update({
+    id: '/lancamentos',
+    path: '/lancamentos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedGerenciarRoute = AuthenticatedGerenciarRouteImport.update({
   id: '/gerenciar',
   path: '/gerenciar',
@@ -38,10 +45,12 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/gerenciar': typeof AuthenticatedGerenciarRoute
+  '/lancamentos': typeof AuthenticatedLancamentosRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/gerenciar': typeof AuthenticatedGerenciarRoute
+  '/lancamentos': typeof AuthenticatedLancamentosRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -49,18 +58,20 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/gerenciar': typeof AuthenticatedGerenciarRoute
+  '/_authenticated/lancamentos': typeof AuthenticatedLancamentosRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/gerenciar'
+  fullPaths: '/' | '/auth' | '/gerenciar' | '/lancamentos'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/gerenciar' | '/'
+  to: '/auth' | '/gerenciar' | '/lancamentos' | '/'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/gerenciar'
+    | '/_authenticated/lancamentos'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
@@ -92,6 +103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/lancamentos': {
+      id: '/_authenticated/lancamentos'
+      path: '/lancamentos'
+      fullPath: '/lancamentos'
+      preLoaderRoute: typeof AuthenticatedLancamentosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/gerenciar': {
       id: '/_authenticated/gerenciar'
       path: '/gerenciar'
@@ -104,11 +122,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedGerenciarRoute: typeof AuthenticatedGerenciarRoute
+  AuthenticatedLancamentosRoute: typeof AuthenticatedLancamentosRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedGerenciarRoute: AuthenticatedGerenciarRoute,
+  AuthenticatedLancamentosRoute: AuthenticatedLancamentosRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 
@@ -122,3 +142,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
