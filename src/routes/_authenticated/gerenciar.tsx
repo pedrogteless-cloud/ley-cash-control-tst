@@ -186,7 +186,7 @@ function NotasManager() {
               </tr>
             </thead>
             <tbody>
-              {notas.map((n) => {
+              {filtered.map((n) => {
                 const enviar = isEnviar(n);
                 return (
                   <tr key={n.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
@@ -224,8 +224,10 @@ function NotasManager() {
                   </tr>
                 );
               })}
-              {notas.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma NF cadastrada.</td></tr>
+              {filtered.length === 0 && (
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  {notas.length === 0 ? "Nenhuma NF cadastrada." : "Nenhuma NF para esse filtro."}
+                </td></tr>
               )}
             </tbody>
           </table>
