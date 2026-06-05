@@ -11,10 +11,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -31,19 +29,8 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { display_name: name }, emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-        toast.success("Conta criada! Faça login.");
-        setMode("login");
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro");
     } finally {
@@ -66,9 +53,7 @@ function AuthPage() {
         <div className="mb-6 text-center">
           <div className="text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">◆ Grupo Ley</div>
           <h1 className="mt-1 text-xl font-bold text-foreground">Painel de Cheques</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {mode === "login" ? "Entre na sua conta" : "Crie sua conta"}
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Entre na sua conta</p>
         </div>
 
         <button
@@ -84,14 +69,6 @@ function AuthPage() {
         </div>
 
         <form onSubmit={onSubmit} className="space-y-3">
-          {mode === "signup" && (
-            <input
-              required maxLength={80}
-              value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="Seu nome"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-gold focus:outline-none"
-            />
-          )}
           <input
             type="email" required maxLength={120}
             value={email} onChange={(e) => setEmail(e.target.value)}
@@ -101,23 +78,20 @@ function AuthPage() {
           <input
             type="password" required minLength={6} maxLength={72}
             value={password} onChange={(e) => setPassword(e.target.value)}
-            placeholder="Senha (mín. 6)"
+            placeholder="Senha"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-gold focus:outline-none"
           />
           <button
             type="submit" disabled={loading}
             className="w-full rounded-lg bg-gold px-4 py-2.5 text-sm font-bold text-background hover:bg-gold/90 disabled:opacity-50"
           >
-            {loading ? "..." : mode === "login" ? "Entrar" : "Criar conta"}
+            {loading ? "..." : "Entrar"}
           </button>
         </form>
 
-        <button
-          onClick={() => setMode(mode === "login" ? "signup" : "login")}
-          className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-gold"
-        >
-          {mode === "login" ? "Não tem conta? Criar uma" : "Já tenho conta · Entrar"}
-        </button>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          Acesso restrito. Solicite a criação da sua conta ao administrador.
+        </p>
       </div>
     </div>
   );
