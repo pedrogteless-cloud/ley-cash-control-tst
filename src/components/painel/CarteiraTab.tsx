@@ -77,7 +77,7 @@ export function CarteiraTab({
               {enviarCount} NF{enviarCount > 1 ? "s" : ""} com cheque a enviar
             </div>
             <div className="text-sm text-soft-foreground">
-              Total de {brl(totals.enviar.val)} pronto para repasse pois essa carga já chegou.
+              Total de {brl(totals.enviar.val)} pronto para repasse pois essas cargas já chegaram.
             </div>
           </div>
         </div>
