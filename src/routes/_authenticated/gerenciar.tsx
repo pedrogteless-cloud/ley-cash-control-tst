@@ -328,6 +328,15 @@ const emptyCaixa = {
 function CaixaManager() {
   const { caixa, addCaixa, updateCaixa, removeCaixa } = useStore();
   const [editing, setEditing] = useState<CaixaRecord | "new" | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return caixa;
+    return caixa.filter(
+      (c) => c.data.toLowerCase().includes(q) || (c.destino ?? "").toLowerCase().includes(q)
+    );
+  }, [caixa, search]);
 
   const today = new Date();
   const todayStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}`;
@@ -351,15 +360,30 @@ function CaixaManager() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-foreground">
-          Movimentos do caixa <span className="text-muted-foreground">({caixa.length})</span>
+          Movimentos do caixa{" "}
+          <span className="text-muted-foreground">
+            ({filtered.length}
+            {filtered.length !== caixa.length ? ` de ${caixa.length}` : ""})
+          </span>
         </h2>
         <button
           onClick={() => setEditing("new")}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-sm font-bold text-background hover:bg-gold/90 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-card px-3 py-2 text-sm font-semibold text-gold hover:bg-gold-dim transition-colors"
         >
           <Plus className="h-4 w-4" /> Novo dia
         </button>
       </div>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por data (DD/MM) ou destino..."
+          className="w-full rounded-lg border border-border bg-surface pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+        />
+      </div>
+
 
       {editing !== null && (
         <CaixaForm
