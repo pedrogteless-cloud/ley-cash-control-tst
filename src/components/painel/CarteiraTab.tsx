@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { AlertTriangle, Send, Clock, FileText, Wallet, Search } from "lucide-react";
-import { isEnviar } from "@/data/painel";
+import { isEnviar, isAguardando } from "@/data/painel";
 import { useStore } from "@/data/store";
 import { brl } from "@/lib/format";
 import { KpiCard } from "./KpiCard";
@@ -31,8 +31,8 @@ export function CarteiraTab({
 
   const totals = useMemo(() => {
     const enviar = notas.filter(isEnviar);
-    const aguardando = notas.filter((n) => n.entrega.toUpperCase().includes("NÃO") && n.statusNf.toUpperCase() === "FATURADO");
-    const apenasFat = notas.filter((n) => !isEnviar(n) && !(n.entrega.toUpperCase().includes("NÃO") && n.statusNf.toUpperCase() === "FATURADO"));
+    const aguardando = notas.filter(isAguardando);
+    const apenasFat = notas.filter((n) => !isEnviar(n) && !isAguardando(n));
     const sum = (arr: typeof notas) => arr.reduce((s, n) => s + n.valor, 0);
     const total = sum(notas);
     return {
@@ -180,10 +180,10 @@ export function CarteiraTab({
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((n, i) => {
+                {filtered.map((n) => {
                   const enviar = isEnviar(n);
                   return (
-                    <tr key={i} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
+                    <tr key={n.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
                       <td className="px-4 py-3 font-medium text-foreground">{n.fornecedor}</td>
                       <td className="px-4 py-3 text-soft-foreground">{n.nf}</td>
                       <td className="px-4 py-3 text-muted-foreground">{n.filial}</td>
