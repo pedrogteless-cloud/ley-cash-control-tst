@@ -44,7 +44,7 @@ const mapNf = (r: NfRow): NFRecord => ({
 const mapCaixa = (r: CaixaRow): CaixaRecord => ({
   id: r.id,
   data: r.data,
-  saldoAnterior: toNum(r.saldoAnterior as never) || toNum(r.saldo_anterior),
+  saldoAnterior: toNum(r.saldo_anterior),
   entrada: toNum(r.entrada),
   saida: toNum(r.saida),
   saldoTotal: toNum(r.saldo_total),
