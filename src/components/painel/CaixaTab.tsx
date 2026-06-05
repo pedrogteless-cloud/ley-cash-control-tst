@@ -11,11 +11,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 export function CaixaTab({
   onEdit,
+  readOnly = false,
 }: {
   onEdit?: (kind: "caixa", id: string) => void;
+  readOnly?: boolean;
 }) {
   const { notas, caixa, removeCaixa } = useStore();
   const { canWriteCaixa } = useRoles();
+  const canEdit = !readOnly && canWriteCaixa;
   const isMobile = useIsMobile();
   const totalCarteira = notas.reduce((s, n) => s + n.valor, 0);
 
@@ -101,7 +104,7 @@ export function CaixaTab({
             <CaixaCard
               key={c.id}
               c={c}
-              canWrite={canWriteCaixa}
+              canWrite={canEdit}
               onEdit={() => onEdit?.("caixa", c.id)}
               onDelete={() => confirm(`Remover dia ${c.data}?`) && removeCaixa(c.id)}
             />
