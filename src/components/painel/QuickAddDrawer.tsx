@@ -94,7 +94,7 @@ export function QuickAddDrawer({ open, onOpenChange, mode, initialTab = "nf" }: 
 /* --------------- NF Form --------------- */
 
 function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => void }) {
-  const { addNota, updateNota } = useStore();
+  const { addNota, updateNota, notas } = useStore();
   const [fornecedor, setFornecedor] = useState(initial?.fornecedor ?? "");
   const [nf, setNf] = useState(initial?.nf ?? "");
   const [filial, setFilial] = useState(initial?.filial ?? "MATRIZ");
@@ -103,6 +103,19 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
   const [entrega, setEntrega] = useState(initial?.entrega ?? "NÃO CHEGOU");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+
+  // Sugestões: fornecedores já cadastrados (únicos, ordenados por uso)
+  const fornecedoresSugeridos = Array.from(new Set(notas.map((n) => n.fornecedor))).sort();
+
+  // Aviso: NF duplicada (mesmo número + filial, ignorando o próprio registro em edição)
+  const nfDuplicada =
+    nf.trim().length > 0 &&
+    notas.some(
+      (n) =>
+        n.id !== initial?.id &&
+        n.nf.trim().toLowerCase() === nf.trim().toLowerCase() &&
+        n.filial.trim().toLowerCase() === filial.trim().toLowerCase(),
+    );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,9 +150,15 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
           value={fornecedor}
           onChange={(e) => setFornecedor(e.target.value)}
           maxLength={80}
+          list="fornecedores-list"
           className={inputCls(errors.fornecedor)}
           placeholder="Ex.: Atualle"
         />
+        <datalist id="fornecedores-list">
+          {fornecedoresSugeridos.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
@@ -152,7 +171,27 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
             className={inputCls(errors.nf)}
             placeholder="123456"
           />
+          {nfDuplicada && !errors.nf && (
+            <div className="mt-1 text-[11px] text-orange">
+              ⚠ Já existe uma NF {nf} nessa filial. Confirme antes de salvar.
+            </div>
+          )}
         </Field>
+        <Field label="Filial">
+          <select
+            value={filial}
+            onChange={(e) => setFilial(e.target.value)}
+            className={inputCls()}
+          >
+            {["MATRIZ", "FILIAL", "CARGA", "—"].map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
         <Field label="Filial">
           <select
             value={filial}
