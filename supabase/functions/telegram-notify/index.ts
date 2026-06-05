@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
           `🏢 <b>Filial:</b> ${escapeHtml(record.filial)}`,
           `💰 <b>Valor:</b> ${escapeHtml(brl(record.valor))}`,
           "",
-          "⚠️ <i>Separe o cheque e envie ao fornecedor.</i>",
+          "⚠️ <i>Separe os cheques e envie ao fornecedor.</i>",
         ].join("\n");
         await sendTelegram(msg);
       }
