@@ -104,7 +104,7 @@ export function CaixaTab({
             <CaixaCard
               key={c.id}
               c={c}
-              canWrite={canWriteCaixa}
+              canWrite={canEdit}
               onEdit={() => onEdit?.("caixa", c.id)}
               onDelete={() => confirm(`Remover dia ${c.data}?`) && removeCaixa(c.id)}
             />
