@@ -191,7 +191,7 @@ export function CarteiraTab({
                           </span>
                         ) : (
                           <span className="rounded-md bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
-                            Cheque esp. entrega
+                            Aguardando Carga
                           </span>
                         )}
                       </td>
