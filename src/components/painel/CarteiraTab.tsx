@@ -12,7 +12,7 @@ import { NfCard } from "./NfCard";
 import { useRoles } from "@/hooks/use-role";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-const FILTERS = ["Todas", "Enviar Cheque", "Não Chegou", "Esp. entrega"] as const;
+const FILTERS = ["Todas", "Enviar Cheque", "Aguardando Carga"] as const;
 type Filter = (typeof FILTERS)[number];
 
 export function CarteiraTab({
