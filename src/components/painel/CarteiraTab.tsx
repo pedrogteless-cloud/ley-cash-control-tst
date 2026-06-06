@@ -58,7 +58,7 @@ export function CarteiraTab({
 
   const pieData = [
     { name: "Enviar Cheque", value: totals.enviar.val, color: "#FF9F43" },
-    { name: "Esp. entrega", value: totals.aguardando.val, color: "#58A6FF" },
+    { name: "Aguardando Carga", value: totals.aguardando.val, color: "#58A6FF" },
   ];
 
   const enviarCount = totals.enviar.qtd;
