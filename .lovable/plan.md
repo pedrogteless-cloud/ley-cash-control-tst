@@ -1,24 +1,47 @@
 ## Objetivo
-Fechar o cadastro público no app. Só o admin pode criar novos usuários a partir de agora.
+
+Toda NF cadastrada já é, por definição, FATURADO. Então:
+
+1. **Remover o KPI "Apenas Faturado"** do painel (sempre zerado).
+2. **Remover o seletor "Status NF"** dos formulários — fica fixo como `FATURADO` no banco.
+3. **Manter o campo "Entrega"** (CHEGOU / NÃO CHEGOU) — é ele que decide se o cheque vai ou não.
+4. **Simplificar a lógica**: cheque "ENVIAR" passa a ser simplesmente `entrega === CHEGOU`.
 
 ## Mudanças
 
-### 1. Desabilitar signup no Lovable Cloud
-Via `configure_auth` com `disable_signup: true`. Efeito: a chamada `supabase.auth.signUp(...)` na tela `/auth` vai falhar com erro "Signups not allowed". Ninguém de fora consegue mais criar conta, mesmo com o site público.
+### `src/data/painel.ts`
+- `isEnviar` passa a olhar só `entrega`: `entrega.toUpperCase().includes("CHEGOU")`.
+- `isAguardando` passa a olhar só `entrega`: `entrega.toUpperCase().includes("NÃO")`.
 
-### 2. Esconder UI de signup em `src/routes/auth.tsx`
-- Remover o toggle "Não tem conta? Criar uma"
-- Remover o estado `mode` e o branch de `signUp`
-- Manter só o formulário de login (email/senha + Google)
+### `src/components/painel/CarteiraTab.tsx`
+- Tirar o `KpiCard` "Apenas Faturado".
+- Tirar `apenasFat` do `totals`.
+- Grid de KPIs vira `grid-cols-3` (mantém: Cheque a Enviar, Aguardando, Total Carteira).
+- `pieData` "Esp. entrega" passa a usar só `totals.aguardando.val`.
+- Tabela desktop: remover a coluna "Status NF" (mantém Entrega).
 
-### 3. Como criar novos usuários daqui pra frente
-Duas opções (você escolhe depois, não faz parte deste passo):
-- **Manual**: você (admin) cria pelo painel do Cloud → Users → Add user, e o trigger `handle_new_user` cria o profile + role `diretoria` automaticamente.
-- **Tela de convite no app**: criar uma página `/admin/usuarios` protegida por `has_role('admin')` que usa `supabaseAdmin.auth.admin.createUser(...)` via server function. Posso montar isso num próximo passo se quiser.
+### `src/components/painel/NfCard.tsx`
+- Remover o badge de `statusNf` (mostra só Entrega + ENVIAR).
 
-## Não faz parte deste passo
-- Mudar roles existentes
-- Mexer em RLS
-- Tornar o site privado (continua público; só o cadastro fecha)
+### `src/components/painel/QuickAddDrawer.tsx` (NfForm)
+- Remover o `<select>` "Status NF" e o estado `statusNf`.
+- Continuar enviando `statusNf: "FATURADO"` fixo no payload (compatibilidade com o schema atual).
+- O grid de 2 colunas vira só o campo "Entrega" em coluna inteira.
 
-Confirma que quer seguir assim?
+### `src/routes/_authenticated/gerenciar.tsx` (NotasManager / NotaForm)
+- Remover a coluna "Status" da tabela de NFs.
+- Remover o seletor "Status da NF" do formulário.
+- Salvar `statusNf: "FATURADO"` fixo no payload.
+
+## Banco de dados
+
+Não muda. A coluna `status_nf` continua existindo com default `'FATURADO'` — apenas deixa de ser editável pela UI. Isso evita migration e mantém o histórico de auditoria intacto.
+
+## Notificação Telegram
+
+A função `telegram-notify` hoje diferencia "Nova NF faturada, carga a caminho" (INSERT FATURADO) vs "NF chegou! Cheques a enviar" (UPDATE para CHEGOU). Como toda inserção continuará vindo como FATURADO e a transição "chegou" agora será detectada por mudança no campo `entrega`, **proponho ajustar o gatilho**:
+
+- INSERT: continua mandando "Nova NF faturada, carga a caminho!" (já é assim).
+- UPDATE: dispara "NF chegou! Cheques a enviar..." quando `entrega` muda para CHEGOU (em vez de `status_nf`).
+
+Se preferir deixar a notificação como está agora (olhando `status_nf`), me avise antes de eu mexer — fora isso, sigo com essa adaptação.
