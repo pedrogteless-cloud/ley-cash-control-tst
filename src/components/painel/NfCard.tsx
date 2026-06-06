@@ -33,17 +33,8 @@ export function NfCard({
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <span
-          className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-            n.statusNf.toUpperCase() === "CHEGOU"
-              ? "bg-green-dim text-green"
-              : "bg-gold-dim text-gold"
-          }`}
-        >
-          {n.statusNf}
-        </span>
-        <span
           className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
-            naoChegou ? "bg-blue-dim text-blue" : "bg-surface text-soft-foreground ring-1 ring-border"
+            naoChegou ? "bg-blue-dim text-blue" : "bg-green-dim text-green"
           }`}
         >
           {n.entrega}

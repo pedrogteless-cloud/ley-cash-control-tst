@@ -52,9 +52,11 @@ Deno.serve(async (req) => {
     }
 
     if (table === "notas_fiscais") {
-      const status = String(record.status_nf ?? "").toUpperCase();
+      const entrega = String(record.entrega ?? "").toUpperCase();
       const op = String(payload.type ?? "").toUpperCase();
-      if (status === "CHEGOU") {
+      const chegou = entrega.includes("CHEGOU") && !entrega.includes("NÃO");
+
+      if (op === "UPDATE" && chegou) {
         const msg = [
           "📬 <b>NF chegou! Cheques a enviar...</b>",
           `🏭 <b>Fornecedor:</b> ${escapeHtml(record.fornecedor)}`,
@@ -65,9 +67,11 @@ Deno.serve(async (req) => {
           "⚠️ <i>Separe os cheques e envie ao fornecedor.</i>",
         ].join("\n");
         await sendTelegram(msg);
-      } else if (op === "INSERT" && status === "FATURADO") {
+      } else if (op === "INSERT") {
         const msg = [
-          "🚚 <b>Nova NF faturada, carga a caminho!</b>",
+          chegou
+            ? "📬 <b>NF chegou! Cheques a enviar...</b>"
+            : "🚚 <b>Nova NF faturada, carga a caminho!</b>",
           `🏭 <b>Fornecedor:</b> ${escapeHtml(record.fornecedor)}`,
           `🧾 <b>NF:</b> ${escapeHtml(record.nf)}`,
           `🏢 <b>Filial:</b> ${escapeHtml(record.filial)}`,
