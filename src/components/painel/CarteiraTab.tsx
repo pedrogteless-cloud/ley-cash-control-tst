@@ -12,7 +12,7 @@ import { NfCard } from "./NfCard";
 import { useRoles } from "@/hooks/use-role";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-const FILTERS = ["Todas", "Enviar Cheque", "Não Chegou", "Esp. entrega"] as const;
+const FILTERS = ["Todas", "Enviar Cheque", "Aguardando Carga"] as const;
 type Filter = (typeof FILTERS)[number];
 
 export function CarteiraTab({
@@ -45,8 +45,7 @@ export function CarteiraTab({
     const q = search.trim().toLowerCase();
     let arr = notas;
     if (filter === "Enviar Cheque") arr = arr.filter(isEnviar);
-    else if (filter === "Não Chegou") arr = arr.filter((n) => n.entrega.toUpperCase().includes("NÃO"));
-    else if (filter === "Esp. entrega") arr = arr.filter((n) => !isEnviar(n));
+    else if (filter === "Aguardando Carga") arr = arr.filter(isAguardando);
     if (q) arr = arr.filter((n) => n.fornecedor.toLowerCase().includes(q) || n.nf.toLowerCase().includes(q));
     return arr;
   }, [filter, search, notas]);
@@ -59,7 +58,7 @@ export function CarteiraTab({
 
   const pieData = [
     { name: "Enviar Cheque", value: totals.enviar.val, color: "#FF9F43" },
-    { name: "Esp. entrega", value: totals.aguardando.val, color: "#58A6FF" },
+    { name: "Aguardando Carga", value: totals.aguardando.val, color: "#58A6FF" },
   ];
 
   const enviarCount = totals.enviar.qtd;
@@ -84,7 +83,7 @@ export function CarteiraTab({
       {/* KPIs */}
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
         <KpiCard label="Cheque a Enviar" value={brl(totals.enviar.val)} hint={`${totals.enviar.qtd} notas`} explain="Cheques prontos para mandar ao fornecedor." tone="orange" icon={<Send className="h-4 w-4" />} />
-        <KpiCard label="Aguardando" value={brl(totals.aguardando.val)} hint={`${totals.aguardando.qtd} notas`} explain="Mercadoria ainda não chegou." tone="blue" icon={<Clock className="h-4 w-4" />} />
+        <KpiCard label="Aguardando Carga" value={brl(totals.aguardando.val)} hint={`${totals.aguardando.qtd} notas`} explain="Mercadoria ainda não chegou." tone="blue" icon={<Clock className="h-4 w-4" />} />
         <KpiCard label="Total Carteira" value={brl(totals.total)} hint={`${notas.length} notas`} explain="Soma de tudo que ainda está em aberto." tone="green" icon={<Wallet className="h-4 w-4" />} />
       </div>
 
@@ -192,7 +191,7 @@ export function CarteiraTab({
                           </span>
                         ) : (
                           <span className="rounded-md bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
-                            Cheque esp. entrega
+                            Aguardando Carga
                           </span>
                         )}
                       </td>
