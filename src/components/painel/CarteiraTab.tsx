@@ -45,8 +45,7 @@ export function CarteiraTab({
     const q = search.trim().toLowerCase();
     let arr = notas;
     if (filter === "Enviar Cheque") arr = arr.filter(isEnviar);
-    else if (filter === "Não Chegou") arr = arr.filter((n) => n.entrega.toUpperCase().includes("NÃO"));
-    else if (filter === "Esp. entrega") arr = arr.filter((n) => !isEnviar(n));
+    else if (filter === "Aguardando Carga") arr = arr.filter(isAguardando);
     if (q) arr = arr.filter((n) => n.fornecedor.toLowerCase().includes(q) || n.nf.toLowerCase().includes(q));
     return arr;
   }, [filter, search, notas]);
