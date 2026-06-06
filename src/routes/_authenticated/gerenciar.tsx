@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Shield, Search } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Shield, Search, History } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { brl } from "@/lib/format";
 import { isEnviar } from "@/data/painel";
 import { listTeam, setRole } from "@/lib/api/roles.functions";
 import { useRoles } from "@/hooks/use-role";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/gerenciar")({
   head: () => ({
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/gerenciar")({
   component: GerenciarPage,
 });
 
-type Tab = "nfs" | "caixa" | "time";
+type Tab = "nfs" | "caixa" | "time" | "auditoria";
 
 function GerenciarPage() {
   const { isAdmin } = useRoles();
@@ -51,6 +52,7 @@ function GerenciarPage() {
             { id: "nfs", label: "Notas Fiscais" },
             { id: "caixa", label: "Movimentos de Caixa" },
             ...(isAdmin ? [{ id: "time" as const, label: "Time" }] : []),
+            ...(isAdmin ? [{ id: "auditoria" as const, label: "Auditoria" }] : []),
           ] as { id: Tab; label: string }[]).map((t) => (
             <button
               key={t.id}
@@ -71,6 +73,7 @@ function GerenciarPage() {
         {tab === "nfs" && <NotasManager />}
         {tab === "caixa" && <CaixaManager />}
         {tab === "time" && isAdmin && <TeamManager />}
+        {tab === "auditoria" && isAdmin && <AuditoriaManager />}
       </main>
     </div>
   );
