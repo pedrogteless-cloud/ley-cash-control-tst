@@ -617,6 +617,214 @@ function TeamManager() {
   );
 }
 
+/* ------------- Auditoria ------------- */
+
+type AuditRow = {
+  id: string;
+  table_name: string;
+  record_id: string;
+  action: "UPDATE" | "DELETE";
+  changed_by: string | null;
+  changed_at: string;
+  data_before: Record<string, unknown> | null;
+  data_after: Record<string, unknown> | null;
+};
+
+const TABLE_LABEL: Record<string, string> = {
+  notas_fiscais: "NF",
+  caixa_movimentos: "Caixa",
+};
+
+const FIELD_LABEL: Record<string, string> = {
+  fornecedor: "Fornecedor",
+  nf: "NF",
+  filial: "Filial",
+  valor: "Valor",
+  status_nf: "Status",
+  entrega: "Entrega",
+  data: "Data",
+  saldo_anterior: "Saldo ant.",
+  entrada: "Entrada",
+  saida: "Saída",
+  saldo_total: "Saldo total",
+  destino: "Destino",
+};
+
+function diffFields(
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
+) {
+  if (!before) return [];
+  const target = after ?? {};
+  const changes: { field: string; from: unknown; to: unknown }[] = [];
+  for (const k of Object.keys(FIELD_LABEL)) {
+    const a = before[k];
+    const b = target[k];
+    if (after === null || JSON.stringify(a) !== JSON.stringify(b)) {
+      if (after === null) {
+        changes.push({ field: k, from: a, to: undefined });
+      } else if (a !== undefined || b !== undefined) {
+        changes.push({ field: k, from: a, to: b });
+      }
+    }
+  }
+  return changes;
+}
+
+const fmtVal = (v: unknown) => {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "number") return String(v);
+  return String(v);
+};
+
+function AuditoriaManager() {
+  const [tableFilter, setTableFilter] = useState<string>("Todas");
+  const [actionFilter, setActionFilter] = useState<string>("Todas");
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["audit_log"],
+    queryFn: async (): Promise<AuditRow[]> => {
+      const { data, error } = await supabase
+        .from("audit_log")
+        .select("id, table_name, record_id, action, changed_by, changed_at, data_before, data_after")
+        .order("changed_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as AuditRow[];
+    },
+  });
+
+  const userIds = useMemo(
+    () => Array.from(new Set((data ?? []).map((r) => r.changed_by).filter(Boolean) as string[])),
+    [data],
+  );
+
+  const { data: profiles } = useQuery({
+    queryKey: ["audit_profiles", userIds.sort().join(",")],
+    queryFn: async () => {
+      if (userIds.length === 0) return [] as { id: string; display_name: string; email: string | null }[];
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, email")
+        .in("id", userIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: userIds.length > 0,
+  });
+
+  const userMap = useMemo(() => {
+    const m = new Map<string, string>();
+    (profiles ?? []).forEach((p) => m.set(p.id, p.display_name || p.email || p.id));
+    return m;
+  }, [profiles]);
+
+  const filtered = useMemo(() => {
+    return (data ?? []).filter((r) => {
+      if (tableFilter !== "Todas" && r.table_name !== tableFilter) return false;
+      if (actionFilter !== "Todas" && r.action !== actionFilter) return false;
+      return true;
+    });
+  }, [data, tableFilter, actionFilter]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          <History className="h-5 w-5 text-gold" /> Auditoria
+          <span className="text-muted-foreground">({filtered.length})</span>
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={tableFilter}
+            onChange={(e) => setTableFilter(e.target.value)}
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+          >
+            <option value="Todas">Todas as tabelas</option>
+            <option value="notas_fiscais">Notas Fiscais</option>
+            <option value="caixa_movimentos">Caixa</option>
+          </select>
+          <select
+            value={actionFilter}
+            onChange={(e) => setActionFilter(e.target.value)}
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+          >
+            <option value="Todas">Todas as ações</option>
+            <option value="UPDATE">Edição</option>
+            <option value="DELETE">Exclusão</option>
+          </select>
+        </div>
+      </div>
+
+      {isLoading && <div className="text-sm text-muted-foreground">Carregando histórico...</div>}
+      {error && <div className="text-sm text-red">{(error as Error).message}</div>}
+
+      <div className="space-y-3">
+        {filtered.map((r) => {
+          const changes = diffFields(r.data_before, r.data_after);
+          const who = r.changed_by ? userMap.get(r.changed_by) ?? "—" : "—";
+          const when = new Intl.DateTimeFormat("pt-BR", {
+            day: "2-digit", month: "2-digit", year: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          }).format(new Date(r.changed_at));
+          const isDelete = r.action === "DELETE";
+          const before = r.data_before ?? {};
+          const ident = (before.nf as string | undefined) ?? (before.data as string | undefined) ?? r.record_id.slice(0, 8);
+
+          return (
+            <div key={r.id} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${
+                    isDelete ? "bg-red-dim text-red" : "bg-blue-dim text-blue"
+                  }`}>
+                    {isDelete ? "EXCLUSÃO" : "EDIÇÃO"}
+                  </span>
+                  <span className="rounded-md bg-surface px-2 py-0.5 text-xs font-semibold text-soft-foreground ring-1 ring-border">
+                    {TABLE_LABEL[r.table_name] ?? r.table_name}
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{ident}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-soft-foreground">{who}</span> · {when}
+                </div>
+              </div>
+
+              {changes.length > 0 && (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-muted-foreground">
+                        <th className="px-2 py-1 font-medium">Campo</th>
+                        <th className="px-2 py-1 font-medium">Antes</th>
+                        {!isDelete && <th className="px-2 py-1 font-medium">Depois</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {changes.map((c) => (
+                        <tr key={c.field} className="border-t border-border/50">
+                          <td className="px-2 py-1 font-semibold text-soft-foreground">{FIELD_LABEL[c.field] ?? c.field}</td>
+                          <td className="px-2 py-1 text-red">{fmtVal(c.from)}</td>
+                          {!isDelete && <td className="px-2 py-1 text-green">{fmtVal(c.to)}</td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {!isLoading && filtered.length === 0 && (
+          <div className="rounded-xl border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+            Nenhum registro de auditoria.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ------------- Helpers ------------- */
 
 
