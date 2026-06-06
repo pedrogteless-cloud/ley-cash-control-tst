@@ -99,7 +99,6 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
   const [nf, setNf] = useState(initial?.nf ?? "");
   const [filial, setFilial] = useState(initial?.filial ?? "MATRIZ");
   const [valorStr, setValorStr] = useState(formatBrlInput(initial?.valor ?? 0));
-  const [statusNf, setStatusNf] = useState(initial?.statusNf ?? "FATURADO");
   const [entrega, setEntrega] = useState(initial?.entrega ?? "NÃO CHEGOU");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -132,7 +131,7 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
       nf: nf.trim().slice(0, 20),
       filial: filial.trim().slice(0, 30),
       valor,
-      statusNf: statusNf.trim().slice(0, 20),
+      statusNf: "FATURADO",
       entrega: entrega.trim().slice(0, 40),
     };
     setSaving(true);
@@ -207,34 +206,19 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
         )}
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Status NF">
-          <select
-            value={statusNf}
-            onChange={(e) => setStatusNf(e.target.value)}
-            className={inputCls()}
-          >
-            {["FATURADO", "CHEGOU"].map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Entrega">
-          <select
-            value={entrega}
-            onChange={(e) => setEntrega(e.target.value)}
-            className={inputCls()}
-          >
-            {["NÃO CHEGOU", "CHEGOU"].map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
+      <Field label="Entrega">
+        <select
+          value={entrega}
+          onChange={(e) => setEntrega(e.target.value)}
+          className={inputCls()}
+        >
+          {["NÃO CHEGOU", "CHEGOU"].map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      </Field>
 
       <FooterButtons saving={saving} onCancel={onDone} />
     </form>

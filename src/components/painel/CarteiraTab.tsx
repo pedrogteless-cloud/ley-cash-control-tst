@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { AlertTriangle, Send, Clock, FileText, Wallet, Search } from "lucide-react";
+import { AlertTriangle, Send, Clock, Wallet, Search } from "lucide-react";
 import { isEnviar, isAguardando } from "@/data/painel";
 import { useStore } from "@/data/store";
 import { brl } from "@/lib/format";
@@ -32,13 +32,11 @@ export function CarteiraTab({
   const totals = useMemo(() => {
     const enviar = notas.filter(isEnviar);
     const aguardando = notas.filter(isAguardando);
-    const apenasFat = notas.filter((n) => !isEnviar(n) && !isAguardando(n));
     const sum = (arr: typeof notas) => arr.reduce((s, n) => s + n.valor, 0);
     const total = sum(notas);
     return {
       enviar: { qtd: enviar.length, val: sum(enviar) },
       aguardando: { qtd: aguardando.length, val: sum(aguardando) },
-      apenasFat: { qtd: apenasFat.length, val: sum(apenasFat) },
       total,
     };
   }, [notas]);
@@ -61,7 +59,7 @@ export function CarteiraTab({
 
   const pieData = [
     { name: "Enviar Cheque", value: totals.enviar.val, color: "#FF9F43" },
-    { name: "Esp. entrega", value: totals.aguardando.val + totals.apenasFat.val, color: "#58A6FF" },
+    { name: "Esp. entrega", value: totals.aguardando.val, color: "#58A6FF" },
   ];
 
   const enviarCount = totals.enviar.qtd;
@@ -84,10 +82,9 @@ export function CarteiraTab({
       )}
 
       {/* KPIs */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
         <KpiCard label="Cheque a Enviar" value={brl(totals.enviar.val)} hint={`${totals.enviar.qtd} notas`} explain="Cheques prontos para mandar ao fornecedor." tone="orange" icon={<Send className="h-4 w-4" />} />
         <KpiCard label="Aguardando" value={brl(totals.aguardando.val)} hint={`${totals.aguardando.qtd} notas`} explain="Mercadoria ainda não chegou." tone="blue" icon={<Clock className="h-4 w-4" />} />
-        <KpiCard label="Apenas Faturado" value={brl(totals.apenasFat.val)} hint={`${totals.apenasFat.qtd} notas`} explain="Nota emitida, esperando próximo passo." tone="gold" icon={<FileText className="h-4 w-4" />} />
         <KpiCard label="Total Carteira" value={brl(totals.total)} hint={`${notas.length} notas`} explain="Soma de tudo que ainda está em aberto." tone="green" icon={<Wallet className="h-4 w-4" />} />
       </div>
 
@@ -174,7 +171,6 @@ export function CarteiraTab({
                   <th className="px-4 py-3 font-medium">NF</th>
                   <th className="px-4 py-3 font-medium">Filial</th>
                   <th className="px-4 py-3 text-right font-medium">Valor</th>
-                  <th className="px-4 py-3 font-medium">Status NF</th>
                   <th className="px-4 py-3 font-medium">Entrega</th>
                   <th className="px-4 py-3 font-medium">Cheque</th>
                 </tr>
@@ -188,11 +184,6 @@ export function CarteiraTab({
                       <td className="px-4 py-3 text-soft-foreground">{n.nf}</td>
                       <td className="px-4 py-3 text-muted-foreground">{n.filial}</td>
                       <td className="px-4 py-3 text-right font-semibold text-foreground">{brl(n.valor)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
-                          n.statusNf.toUpperCase() === "CHEGOU" ? "bg-green-dim text-green" : "bg-gold-dim text-gold"
-                        }`}>{n.statusNf}</span>
-                      </td>
                       <td className="px-4 py-3 text-xs text-soft-foreground">{n.entrega}</td>
                       <td className="px-4 py-3">
                         {enviar ? (
@@ -209,7 +200,7 @@ export function CarteiraTab({
                   );
                 })}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma nota neste filtro.</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma nota neste filtro.</td></tr>
                 )}
               </tbody>
             </table>

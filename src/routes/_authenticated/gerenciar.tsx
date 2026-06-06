@@ -182,7 +182,6 @@ function NotasManager() {
                 <th className="px-4 py-3 font-medium">NF</th>
                 <th className="px-4 py-3 font-medium">Filial</th>
                 <th className="px-4 py-3 text-right font-medium">Valor</th>
-                <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Entrega</th>
                 <th className="px-4 py-3 font-medium">Cheque</th>
                 <th className="px-4 py-3 text-right font-medium">Ações</th>
@@ -197,7 +196,6 @@ function NotasManager() {
                     <td className="px-4 py-3 text-soft-foreground">{n.nf}</td>
                     <td className="px-4 py-3 text-muted-foreground">{n.filial}</td>
                     <td className="px-4 py-3 text-right font-semibold text-foreground">{brl(n.valor)}</td>
-                    <td className="px-4 py-3 text-xs text-soft-foreground">{n.statusNf}</td>
                     <td className="px-4 py-3 text-xs text-soft-foreground">{n.entrega}</td>
                     <td className="px-4 py-3">
                       <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${
@@ -228,7 +226,7 @@ function NotasManager() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
                   {notas.length === 0 ? "Nenhuma NF cadastrada." : "Nenhuma NF para esse filtro."}
                 </td></tr>
               )}
@@ -262,7 +260,7 @@ function NotaForm({
           fornecedor: form.fornecedor.trim().slice(0, 80),
           nf: form.nf.trim().slice(0, 20),
           filial: form.filial.trim().slice(0, 30),
-          statusNf: form.statusNf.trim().slice(0, 20),
+          statusNf: "FATURADO",
           entrega: form.entrega.trim().slice(0, 40),
         });
       }}
@@ -289,19 +287,10 @@ function NotaForm({
             className={inputCls}
           />
         </Field>
-        <Field label="Status da NF">
-          <select value={form.statusNf} onChange={(e) => set("statusNf", e.target.value)} className={inputCls}>
-            {["FATURADO", "CHEGOU"].map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </Field>
         <Field label="Entrega">
-          <input
-            value={form.entrega}
-            onChange={(e) => set("entrega", e.target.value)}
-            maxLength={40}
-            placeholder="Ex.: CHEGOU 01/06 ou NÃO CHEGOU"
-            className={inputCls}
-          />
+          <select value={form.entrega} onChange={(e) => set("entrega", e.target.value)} className={inputCls}>
+            {["NÃO CHEGOU", "CHEGOU"].map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
         </Field>
       </div>
 
