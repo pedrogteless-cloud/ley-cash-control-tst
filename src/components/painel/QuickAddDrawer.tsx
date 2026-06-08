@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Save, X } from "lucide-react";
+import { Save, X, Loader2 } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/drawer";
 import { useStore, type NFRecord, type CaixaRecord } from "@/data/store";
 import { brl, parseBrlInput, formatBrlInput } from "@/lib/format";
+import { useRoles } from "@/hooks/use-role";
 
 type Mode =
   | { kind: "new-nf" }
@@ -229,11 +230,17 @@ function NfForm({ initial, onDone }: { initial: NFRecord | null; onDone: () => v
 
 function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: () => void }) {
   const { addCaixa, updateCaixa, caixa } = useStore();
+  const { isAdmin } = useRoles();
   const today = new Date();
   const todayStr = `${String(today.getDate()).padStart(2, "0")}/${String(
     today.getMonth() + 1,
   ).padStart(2, "0")}`;
   const lastSaldo = caixa.length ? caixa[caixa.length - 1].saldoTotal : 0;
+
+  // Saída do dia já lançada (automática via baixa de NF) — exibida apenas como leitura no modo simples
+  const saidaHoje = caixa
+    .filter((c) => c.data === (initial?.data ?? todayStr))
+    .reduce((s, c) => s + c.saida, 0);
 
   const [dataStr, setDataStr] = useState(initial?.data ?? todayStr);
   const [saldoAntStr, setSaldoAntStr] = useState(
@@ -245,10 +252,13 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  // Editing existing record always uses full form. Non-admin lancador_caixa: simplified.
+  const modoSimples = !isAdmin && !initial;
+
   const ant = parseBrlInput(saldoAntStr);
   const ent = parseBrlInput(entradaStr);
-  const sai = parseBrlInput(saidaStr);
-  const total = ant + ent - sai;
+  const sai = modoSimples ? 0 : parseBrlInput(saidaStr);
+  const total = modoSimples ? ant + ent - saidaHoje : ant + ent - sai;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,7 +272,7 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
       saldoAnterior: ant,
       entrada: ent,
       saida: sai,
-      saldoTotal: total,
+      saldoTotal: modoSimples ? ant + ent : ant + ent - sai,
       destino: destino.trim() ? destino.trim().slice(0, 100) : undefined,
     };
     setSaving(true);
@@ -297,36 +307,61 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Entrada (R$)">
-          <input
-            value={entradaStr}
-            onChange={(e) => setEntradaStr(e.target.value)}
-            inputMode="decimal"
-            className={inputCls()}
-            placeholder="0,00"
-          />
-        </Field>
-        <Field label="Saída (R$)">
-          <input
-            value={saidaStr}
-            onChange={(e) => setSaidaStr(e.target.value)}
-            inputMode="decimal"
-            className={inputCls()}
-            placeholder="0,00"
-          />
-        </Field>
-      </div>
+      {modoSimples ? (
+        <>
+          <Field label="Entrada (R$)">
+            <input
+              value={entradaStr}
+              onChange={(e) => setEntradaStr(e.target.value)}
+              inputMode="decimal"
+              className={inputCls()}
+              placeholder="0,00"
+            />
+          </Field>
+          {saidaHoje > 0 && (
+            <div className="rounded-lg border border-orange/30 bg-orange-dim/30 px-3 py-2 text-xs">
+              <span className="font-semibold text-orange">Saídas automáticas do dia:</span>{" "}
+              <span className="text-foreground">{brl(saidaHoje)}</span>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">
+                Lançadas pelas baixas de cheque das NFs.
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Entrada (R$)">
+              <input
+                value={entradaStr}
+                onChange={(e) => setEntradaStr(e.target.value)}
+                inputMode="decimal"
+                className={inputCls()}
+                placeholder="0,00"
+              />
+            </Field>
+            <Field label="Saída (R$)">
+              <input
+                value={saidaStr}
+                onChange={(e) => setSaidaStr(e.target.value)}
+                inputMode="decimal"
+                className={inputCls()}
+                placeholder="0,00"
+              />
+            </Field>
+          </div>
 
-      <Field label="Destino da saída">
-        <input
-          value={destino}
-          onChange={(e) => setDestino(e.target.value)}
-          maxLength={100}
-          className={inputCls()}
-          placeholder="Ex.: Atualle + Nobeltex"
-        />
-      </Field>
+          <Field label="Destino da saída">
+            <input
+              value={destino}
+              onChange={(e) => setDestino(e.target.value)}
+              maxLength={100}
+              className={inputCls()}
+              placeholder="Ex.: Atualle + Nobeltex"
+            />
+          </Field>
+        </>
+      )}
 
       <div className="rounded-lg border border-border bg-surface px-3 py-2">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -373,16 +408,17 @@ function FooterButtons({ saving, onCancel }: { saving: boolean; onCancel: () => 
       <button
         type="button"
         onClick={onCancel}
-        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-semibold text-soft-foreground hover:text-foreground"
+        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-semibold text-soft-foreground transition-transform transition-colors duration-150 hover:text-foreground active:scale-95"
       >
         <X className="h-4 w-4" /> Cancelar
       </button>
       <button
         type="submit"
         disabled={saving}
-        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold px-3 py-3 text-sm font-bold text-background hover:bg-gold/90 disabled:opacity-50"
+        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold px-3 py-3 text-sm font-bold text-background transition-transform transition-colors duration-150 hover:bg-gold/90 active:scale-95 disabled:opacity-50"
       >
-        <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar"}
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{" "}
+        {saving ? "Salvando..." : "Salvar"}
       </button>
     </DrawerFooter>
   );

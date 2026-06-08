@@ -1,5 +1,6 @@
 // Telegram notification edge function
-// Invoked by Postgres triggers (via pg_net) on inserts to notas_fiscais and caixa_movimentos.
+// Invoked by Postgres triggers (via pg_net) on inserts to notas_fiscais and caixa_movimentos,
+// and pelo cliente quando um cheque é confirmado como enviado.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,11 +39,48 @@ async function sendTelegram(text: string) {
   return { ok: res.ok, data };
 }
 
+type NfPayload = { fornecedor: string; nf: string; valor: number };
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const payload = await req.json();
+
+    // ============ NOVO: Cheque enviado (chamado pelo cliente) ============
+    if (payload?.type === "cheque_enviado" && Array.isArray(payload.notas)) {
+      const notas = payload.notas as NfPayload[];
+      const dataStr = String(payload.data ?? "");
+
+      // Agrupar por fornecedor
+      const groups = new Map<string, { nfs: string[]; total: number }>();
+      for (const n of notas) {
+        const g = groups.get(n.fornecedor) ?? { nfs: [], total: 0 };
+        g.nfs.push(String(n.nf));
+        g.total += Number(n.valor) || 0;
+        groups.set(n.fornecedor, g);
+      }
+
+      const titulo =
+        notas.length === 1
+          ? "🟢 <b>Cheque enviado — Grupo Ley</b>"
+          : "🟢 <b>Cheques enviados — Grupo Ley</b>";
+
+      const linhas: string[] = [titulo, ""];
+      for (const [fornecedor, g] of groups) {
+        linhas.push(`🏭 <b>Fornecedor:</b> ${escapeHtml(fornecedor)}`);
+        linhas.push(`🧾 <b>NF:</b> ${escapeHtml(g.nfs.join(", "))}`);
+        linhas.push(`💰 <b>Valor:</b> ${escapeHtml(brl(g.total))}`);
+        linhas.push("");
+      }
+      if (dataStr) linhas.push(`📅 <b>Data:</b> ${escapeHtml(dataStr)}`);
+
+      await sendTelegram(linhas.join("\n"));
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { table, record } = payload ?? {};
 
     if (!record) {
@@ -80,6 +118,13 @@ Deno.serve(async (req) => {
         await sendTelegram(msg);
       }
     } else if (table === "caixa_movimentos") {
+      // Não notificar lançamentos automáticos (já notificamos via cheque_enviado)
+      if (record.origem === "auto_nf") {
+        return new Response(JSON.stringify({ ok: true, skipped: "auto_nf" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const msg = [
         "💼 <b>Novo movimento de caixa</b>",
         `📅 <b>Data:</b> ${escapeHtml(record.data)}`,

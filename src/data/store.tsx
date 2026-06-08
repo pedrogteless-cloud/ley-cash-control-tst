@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NF, CaixaDia } from "@/data/painel";
@@ -14,6 +14,7 @@ type NfRow = {
   valor: number | string;
   status_nf: string;
   entrega: string;
+  cheque_enviado_em?: string | null;
   created_at?: string;
 };
 
@@ -25,6 +26,7 @@ type CaixaRow = {
   saida: number | string;
   saldo_total: number | string;
   destino: string | null;
+  origem?: string | null;
   created_at?: string;
 };
 
@@ -38,6 +40,7 @@ const mapNf = (r: NfRow): NFRecord => ({
   valor: toNum(r.valor),
   statusNf: r.status_nf,
   entrega: r.entrega,
+  chequeEnviadoEm: r.cheque_enviado_em ?? undefined,
   createdAt: r.created_at,
 });
 
@@ -49,6 +52,7 @@ const mapCaixa = (r: CaixaRow): CaixaRecord => ({
   saida: toNum(r.saida),
   saldoTotal: toNum(r.saldo_total),
   destino: r.destino ?? undefined,
+  origem: r.origem ?? undefined,
   createdAt: r.created_at,
 });
 
@@ -56,6 +60,21 @@ const QK = {
   notas: ["notas_fiscais"] as const,
   caixa: ["caixa_movimentos"] as const,
 };
+
+const todayDDMM = () => {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const todayDDMMYYYY = () => {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+async function snapshot<T>(qc: QueryClient, key: readonly unknown[]) {
+  await qc.cancelQueries({ queryKey: key });
+  return qc.getQueryData<T>(key);
+}
 
 export function useStore() {
   const qc = useQueryClient();
@@ -65,7 +84,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notas_fiscais")
-        .select("id, fornecedor, nf, filial, valor, status_nf, entrega, created_at")
+        .select("id, fornecedor, nf, filial, valor, status_nf, entrega, cheque_enviado_em, created_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as NfRow[]).map(mapNf);
@@ -77,7 +96,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("caixa_movimentos")
-        .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino, created_at")
+        .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino, origem, created_at")
         .order("data", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -87,6 +106,8 @@ export function useStore() {
 
   const invalidateNotas = () => qc.invalidateQueries({ queryKey: QK.notas });
   const invalidateCaixa = () => qc.invalidateQueries({ queryKey: QK.caixa });
+
+  // ============ NF MUTATIONS ============
 
   const addNotaM = useMutation({
     mutationFn: async (n: Omit<NFRecord, "id">) => {
@@ -102,11 +123,22 @@ export function useStore() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      invalidateNotas();
-      toast.success("Nota fiscal adicionada");
+    onMutate: async (n) => {
+      const prev = await snapshot<NFRecord[]>(qc, QK.notas);
+      const optimistic: NFRecord = {
+        ...n,
+        id: `optimistic-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+      };
+      qc.setQueryData<NFRecord[]>(QK.notas, (old) => [optimistic, ...(old ?? [])]);
+      return { prev };
     },
-    onError: (e: Error) => toast.error(`Erro ao salvar: ${e.message}`),
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(QK.notas, ctx.prev);
+      toast.error(`Erro ao salvar: ${e.message}`);
+    },
+    onSuccess: () => toast.success("Nota fiscal adicionada"),
+    onSettled: () => invalidateNotas(),
   });
 
   const updateNotaM = useMutation({
@@ -124,11 +156,19 @@ export function useStore() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      invalidateNotas();
-      toast.success("Nota fiscal atualizada");
+    onMutate: async ({ id, n }) => {
+      const prev = await snapshot<NFRecord[]>(qc, QK.notas);
+      qc.setQueryData<NFRecord[]>(QK.notas, (old) =>
+        (old ?? []).map((x) => (x.id === id ? { ...x, ...n } : x)),
+      );
+      return { prev };
     },
-    onError: (e: Error) => toast.error(`Erro ao atualizar: ${e.message}`),
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(QK.notas, ctx.prev);
+      toast.error(`Erro ao atualizar: ${e.message}`);
+    },
+    onSuccess: () => toast.success("Nota fiscal atualizada"),
+    onSettled: () => invalidateNotas(),
   });
 
   const removeNotaM = useMutation({
@@ -136,9 +176,18 @@ export function useStore() {
       const { error } = await supabase.from("notas_fiscais").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_d, id) => {
-      const removed = (notasQ.data ?? []).find((n) => n.id === id);
-      invalidateNotas();
+    onMutate: async (id) => {
+      const prev = await snapshot<NFRecord[]>(qc, QK.notas);
+      const removed = (prev ?? []).find((n) => n.id === id);
+      qc.setQueryData<NFRecord[]>(QK.notas, (old) => (old ?? []).filter((n) => n.id !== id));
+      return { prev, removed };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(QK.notas, ctx.prev);
+      toast.error(`Erro ao remover: ${e.message}`);
+    },
+    onSuccess: (_d, _id, ctx) => {
+      const removed = ctx?.removed;
       toast.success("Nota fiscal removida", {
         action: removed
           ? {
@@ -152,8 +201,10 @@ export function useStore() {
         duration: 6000,
       });
     },
-    onError: (e: Error) => toast.error(`Erro ao remover: ${e.message}`),
+    onSettled: () => invalidateNotas(),
   });
+
+  // ============ CAIXA MUTATIONS ============
 
   const addCaixaM = useMutation({
     mutationFn: async (c: Omit<CaixaRecord, "id">) => {
@@ -169,11 +220,22 @@ export function useStore() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      invalidateCaixa();
-      toast.success("Movimento de caixa salvo");
+    onMutate: async (c) => {
+      const prev = await snapshot<CaixaRecord[]>(qc, QK.caixa);
+      const optimistic: CaixaRecord = {
+        ...c,
+        id: `optimistic-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+      };
+      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) => [...(old ?? []), optimistic]);
+      return { prev };
     },
-    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(QK.caixa, ctx.prev);
+      toast.error(`Erro: ${e.message}`);
+    },
+    onSuccess: () => toast.success("Movimento de caixa salvo"),
+    onSettled: () => invalidateCaixa(),
   });
 
   const updateCaixaM = useMutation({
@@ -191,11 +253,19 @@ export function useStore() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      invalidateCaixa();
-      toast.success("Movimento atualizado");
+    onMutate: async ({ id, c }) => {
+      const prev = await snapshot<CaixaRecord[]>(qc, QK.caixa);
+      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) =>
+        (old ?? []).map((x) => (x.id === id ? { ...x, ...c } : x)),
+      );
+      return { prev };
     },
-    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(QK.caixa, ctx.prev);
+      toast.error(`Erro: ${e.message}`);
+    },
+    onSuccess: () => toast.success("Movimento atualizado"),
+    onSettled: () => invalidateCaixa(),
   });
 
   const removeCaixaM = useMutation({
@@ -203,9 +273,18 @@ export function useStore() {
       const { error } = await supabase.from("caixa_movimentos").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_d, id) => {
-      const removed = (caixaQ.data ?? []).find((c) => c.id === id);
-      invalidateCaixa();
+    onMutate: async (id) => {
+      const prev = await snapshot<CaixaRecord[]>(qc, QK.caixa);
+      const removed = (prev ?? []).find((c) => c.id === id);
+      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) => (old ?? []).filter((c) => c.id !== id));
+      return { prev, removed };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(QK.caixa, ctx.prev);
+      toast.error(`Erro: ${e.message}`);
+    },
+    onSuccess: (_d, _id, ctx) => {
+      const removed = ctx?.removed;
       toast.success("Movimento removido", {
         action: removed
           ? {
@@ -219,7 +298,90 @@ export function useStore() {
         duration: 6000,
       });
     },
-    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+    onSettled: () => invalidateCaixa(),
+  });
+
+  // ============ CONFIRMAR ENVIO ============
+
+  const confirmarEnvioM = useMutation({
+    mutationFn: async (nfId: string) => {
+      const { data, error } = await supabase.rpc("confirmar_envio_nf", { p_nf_id: nfId });
+      if (error) throw error;
+      return data as { id: string; fornecedor: string; nf: string; valor: number };
+    },
+    onMutate: async (nfId) => {
+      const prevNotas = await snapshot<NFRecord[]>(qc, QK.notas);
+      const prevCaixa = await snapshot<CaixaRecord[]>(qc, QK.caixa);
+      const nf = (prevNotas ?? []).find((n) => n.id === nfId);
+      if (!nf) return { prevNotas, prevCaixa };
+
+      const nowIso = new Date().toISOString();
+      qc.setQueryData<NFRecord[]>(QK.notas, (old) =>
+        (old ?? []).map((n) => (n.id === nfId ? { ...n, chequeEnviadoEm: nowIso } : n)),
+      );
+
+      const hoje = todayDDMM();
+      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) => {
+        const arr = [...(old ?? [])];
+        const idx = arr.map((c, i) => ({ c, i })).filter((x) => x.c.data === hoje).pop();
+        if (idx) {
+          const c = idx.c;
+          const novaSaida = c.saida + nf.valor;
+          const novoDestino =
+            !c.destino || c.destino.trim() === ""
+              ? nf.fornecedor
+              : c.destino.includes(nf.fornecedor)
+                ? c.destino
+                : `${c.destino} + ${nf.fornecedor}`;
+          arr[idx.i] = {
+            ...c,
+            saida: novaSaida,
+            saldoTotal: c.saldoAnterior + c.entrada - novaSaida,
+            destino: novoDestino,
+          };
+        } else {
+          const last = arr[arr.length - 1];
+          const saldoAnt = last?.saldoTotal ?? 0;
+          arr.push({
+            id: `optimistic-${Date.now()}`,
+            data: hoje,
+            saldoAnterior: saldoAnt,
+            entrada: 0,
+            saida: nf.valor,
+            saldoTotal: saldoAnt - nf.valor,
+            destino: nf.fornecedor,
+            origem: "auto_nf",
+            createdAt: nowIso,
+          });
+        }
+        return arr;
+      });
+
+      return { prevNotas, prevCaixa, nf };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prevNotas) qc.setQueryData(QK.notas, ctx.prevNotas);
+      if (ctx?.prevCaixa) qc.setQueryData(QK.caixa, ctx.prevCaixa);
+      toast.error(`Erro ao confirmar envio: ${e.message}`);
+    },
+    onSuccess: async (data) => {
+      toast.success(`Cheque enviado: ${data.fornecedor}`);
+      try {
+        await supabase.functions.invoke("telegram-notify", {
+          body: {
+            type: "cheque_enviado",
+            notas: [{ fornecedor: data.fornecedor, nf: data.nf, valor: Number(data.valor) }],
+            data: todayDDMMYYYY(),
+          },
+        });
+      } catch (err) {
+        console.error("telegram-notify invoke failed", err);
+      }
+    },
+    onSettled: () => {
+      invalidateNotas();
+      invalidateCaixa();
+    },
   });
 
   return {
@@ -232,5 +394,9 @@ export function useStore() {
     addCaixa: (c: Omit<CaixaRecord, "id">) => addCaixaM.mutate(c),
     updateCaixa: (id: string, c: Omit<CaixaRecord, "id">) => updateCaixaM.mutate({ id, c }),
     removeCaixa: (id: string) => removeCaixaM.mutate(id),
+    confirmarEnvio: (id: string) => confirmarEnvioM.mutate(id),
+    confirmandoEnvioId: confirmarEnvioM.isPending ? confirmarEnvioM.variables ?? null : null,
+    addingNota: addNotaM.isPending,
+    addingCaixa: addCaixaM.isPending,
   };
 }

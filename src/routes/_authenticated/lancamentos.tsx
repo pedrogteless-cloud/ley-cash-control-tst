@@ -169,7 +169,7 @@ function Lancamentos() {
 
       <button
         onClick={openFab}
-        className="fixed bottom-6 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gold text-background shadow-lg shadow-gold/30 hover:bg-gold/90 sm:right-6"
+        className="fixed bottom-6 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gold text-background shadow-lg shadow-gold/30 transition-transform transition-colors duration-150 hover:bg-gold/90 active:scale-95 sm:right-6"
         aria-label="Novo lançamento"
       >
         <Plus className="h-6 w-6" />
@@ -262,10 +262,10 @@ function NfRow({
       <div className="text-right">
         <div className="text-sm font-bold text-foreground">{brl(n.valor)}</div>
         <div className="mt-1 flex justify-end gap-1">
-          <button onClick={onEdit} className="rounded-md p-1.5 text-blue hover:bg-blue-dim" aria-label="Editar">
+          <button onClick={onEdit} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-blue transition-transform transition-colors duration-150 hover:bg-blue-dim active:scale-95" aria-label="Editar">
             <Pencil className="h-4 w-4" />
           </button>
-          <button onClick={onDelete} className="rounded-md p-1.5 text-red hover:bg-red-dim" aria-label="Excluir">
+          <button onClick={onDelete} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-red transition-transform transition-colors duration-150 hover:bg-red-dim active:scale-95" aria-label="Excluir">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
@@ -304,10 +304,10 @@ function CaixaRow({
       <div className="text-right">
         <div className={`text-sm font-bold ${tone}`}>{brl(valor)}</div>
         <div className="mt-1 flex justify-end gap-1">
-          <button onClick={onEdit} className="rounded-md p-1.5 text-blue hover:bg-blue-dim" aria-label="Editar">
+          <button onClick={onEdit} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-blue transition-transform transition-colors duration-150 hover:bg-blue-dim active:scale-95" aria-label="Editar">
             <Pencil className="h-4 w-4" />
           </button>
-          <button onClick={onDelete} className="rounded-md p-1.5 text-red hover:bg-red-dim" aria-label="Excluir">
+          <button onClick={onDelete} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-red transition-transform transition-colors duration-150 hover:bg-red-dim active:scale-95" aria-label="Excluir">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>

@@ -3,17 +3,27 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { AlertTriangle, Send, Clock, Wallet, Search } from "lucide-react";
-import { isEnviar, isAguardando } from "@/data/painel";
+import { AlertTriangle, Send, Clock, Wallet, Search, CheckCircle2 } from "lucide-react";
+import { isAEnviar, isAguardando, isEnviado } from "@/data/painel";
 import { useStore } from "@/data/store";
 import { brl } from "@/lib/format";
 import { KpiCard } from "./KpiCard";
 import { NfCard } from "./NfCard";
 import { useRoles } from "@/hooks/use-role";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-const FILTERS = ["Todas", "Enviar Cheque", "Aguardando Carga"] as const;
+const FILTERS = ["Todas", "Enviar Cheque", "Aguardando Carga", "Enviados"] as const;
 type Filter = (typeof FILTERS)[number];
+
+const fmtDate = (iso?: string) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 
 export function CarteiraTab({
   onEdit,
@@ -22,37 +32,42 @@ export function CarteiraTab({
   onEdit?: (kind: "nf", id: string) => void;
   readOnly?: boolean;
 }) {
-  const { notas, removeNota } = useStore();
+  const { notas, removeNota, confirmarEnvio, confirmandoEnvioId } = useStore();
   const { canWriteNf } = useRoles();
   const canEdit = !readOnly && canWriteNf;
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState<Filter>("Todas");
   const [search, setSearch] = useState("");
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; fornecedor: string; valor: number } | null>(null);
 
   const totals = useMemo(() => {
-    const enviar = notas.filter(isEnviar);
+    const enviar = notas.filter(isAEnviar);
     const aguardando = notas.filter(isAguardando);
+    const enviados = notas.filter(isEnviado);
     const sum = (arr: typeof notas) => arr.reduce((s, n) => s + n.valor, 0);
-    const total = sum(notas);
+    // Carteira total = ainda em aberto (não enviados)
+    const emAberto = notas.filter((n) => !isEnviado(n));
     return {
       enviar: { qtd: enviar.length, val: sum(enviar) },
       aguardando: { qtd: aguardando.length, val: sum(aguardando) },
-      total,
+      enviados: { qtd: enviados.length, val: sum(enviados) },
+      total: sum(emAberto),
     };
   }, [notas]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let arr = notas;
-    if (filter === "Enviar Cheque") arr = arr.filter(isEnviar);
+    if (filter === "Enviar Cheque") arr = arr.filter(isAEnviar);
     else if (filter === "Aguardando Carga") arr = arr.filter(isAguardando);
+    else if (filter === "Enviados") arr = arr.filter(isEnviado);
     if (q) arr = arr.filter((n) => n.fornecedor.toLowerCase().includes(q) || n.nf.toLowerCase().includes(q));
     return arr;
   }, [filter, search, notas]);
 
   const porFornecedor = useMemo(() => {
     const m = new Map<string, number>();
-    notas.forEach((n) => m.set(n.fornecedor, (m.get(n.fornecedor) || 0) + n.valor));
+    notas.filter((n) => !isEnviado(n)).forEach((n) => m.set(n.fornecedor, (m.get(n.fornecedor) || 0) + n.valor));
     return Array.from(m, ([fornecedor, valor]) => ({ fornecedor, valor })).sort((a, b) => b.valor - a.valor);
   }, [notas]);
 
@@ -84,7 +99,7 @@ export function CarteiraTab({
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
         <KpiCard label="Cheque a Enviar" value={brl(totals.enviar.val)} hint={`${totals.enviar.qtd} notas`} explain="Cheques prontos para mandar ao fornecedor." tone="orange" icon={<Send className="h-4 w-4" />} />
         <KpiCard label="Aguardando Carga" value={brl(totals.aguardando.val)} hint={`${totals.aguardando.qtd} notas`} explain="Mercadoria ainda não chegou." tone="blue" icon={<Clock className="h-4 w-4" />} />
-        <KpiCard label="Total Carteira" value={brl(totals.total)} hint={`${notas.length} notas`} explain="Soma de tudo que ainda está em aberto." tone="green" icon={<Wallet className="h-4 w-4" />} />
+        <KpiCard label="Total Carteira" value={brl(totals.total)} hint={`${notas.length - totals.enviados.qtd} em aberto`} explain="Soma do que ainda está em aberto." tone="green" icon={<Wallet className="h-4 w-4" />} />
       </div>
 
       {/* Charts - desktop só */}
@@ -132,7 +147,7 @@ export function CarteiraTab({
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-transform transition-colors duration-150 active:scale-95 ${
                 filter === f ? "bg-gold text-background" : "bg-surface text-soft-foreground hover:bg-border/40"
               }`}
             >
@@ -152,6 +167,8 @@ export function CarteiraTab({
               canWrite={canEdit}
               onEdit={() => onEdit?.("nf", n.id)}
               onDelete={() => removeNota(n.id)}
+              onConfirmarEnvio={() => setConfirmTarget({ id: n.id, fornecedor: n.fornecedor, valor: n.valor })}
+              confirmando={confirmandoEnvioId === n.id}
             />
           ))}
           {filtered.length === 0 && (
@@ -172,11 +189,13 @@ export function CarteiraTab({
                   <th className="px-4 py-3 text-right font-medium">Valor</th>
                   <th className="px-4 py-3 font-medium">Entrega</th>
                   <th className="px-4 py-3 font-medium">Cheque</th>
+                  {canEdit && <th className="px-4 py-3 font-medium">Ação</th>}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((n) => {
-                  const enviar = isEnviar(n);
+                  const aEnviar = isAEnviar(n);
+                  const enviado = isEnviado(n);
                   return (
                     <tr key={n.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
                       <td className="px-4 py-3 font-medium text-foreground">{n.fornecedor}</td>
@@ -185,7 +204,11 @@ export function CarteiraTab({
                       <td className="px-4 py-3 text-right font-semibold text-foreground">{brl(n.valor)}</td>
                       <td className="px-4 py-3 text-xs text-soft-foreground">{n.entrega}</td>
                       <td className="px-4 py-3">
-                        {enviar ? (
+                        {enviado ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-green-dim px-2 py-0.5 text-xs font-bold text-green">
+                            <CheckCircle2 className="h-3 w-3" /> Enviado {fmtDate(n.chequeEnviadoEm)}
+                          </span>
+                        ) : aEnviar ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-orange-dim px-2 py-0.5 text-xs font-bold text-orange">
                             <Send className="h-3 w-3" /> ENVIAR CHEQUE
                           </span>
@@ -195,17 +218,60 @@ export function CarteiraTab({
                           </span>
                         )}
                       </td>
+                      {canEdit && (
+                        <td className="px-4 py-3">
+                          {aEnviar && (
+                            <button
+                              onClick={() => setConfirmTarget({ id: n.id, fornecedor: n.fornecedor, valor: n.valor })}
+                              disabled={confirmandoEnvioId === n.id}
+                              className="inline-flex items-center gap-1 rounded-md bg-orange px-2.5 py-1.5 text-xs font-bold text-background transition-transform transition-colors duration-150 hover:bg-orange/90 active:scale-95 disabled:opacity-60"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              {confirmandoEnvioId === n.id ? "Enviando..." : "Confirmar envio"}
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma nota neste filtro.</td></tr>
+                  <tr><td colSpan={canEdit ? 7 : 6} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma nota neste filtro.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!confirmTarget} onOpenChange={(o) => !o && setConfirmTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar envio do cheque?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmTarget && (
+                <>
+                  Confirmar envio do cheque para <strong>{confirmTarget.fornecedor}</strong> — <strong>{brl(confirmTarget.valor)}</strong>?
+                  <br />
+                  Esta ação dá baixa automática no caixa de hoje.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="active:scale-95 transition-transform">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmTarget) confirmarEnvio(confirmTarget.id);
+                setConfirmTarget(null);
+              }}
+              className="bg-orange text-background hover:bg-orange/90 active:scale-95 transition-transform"
+            >
+              Confirmar envio
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
