@@ -1,13 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Shield, Search, History } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Search, History, UserPlus, Copy, RefreshCw } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useStore, type NFRecord, type CaixaRecord } from "@/data/store";
 import { brl } from "@/lib/format";
 import { isEnviar } from "@/data/painel";
-import { listTeam, setRole } from "@/lib/api/roles.functions";
+import { listTeam, setRole, createTeamMember } from "@/lib/api/roles.functions";
 import { useRoles } from "@/hooks/use-role";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -537,13 +537,7 @@ function TeamManager() {
         </h2>
       </div>
 
-      <div className="rounded-xl border border-blue/30 bg-blue-dim/50 p-4 text-sm text-soft-foreground">
-        <div className="mb-1 flex items-center gap-2 font-semibold text-blue">
-          <Shield className="h-4 w-4" /> Como adicionar alguém
-        </div>
-        Peça à pessoa para acessar <span className="font-mono text-foreground">/auth</span> e criar uma conta.
-        Depois volte aqui e marque os papéis dela. Por padrão, novos usuários entram como <b>Diretoria</b> (só leitura).
-      </div>
+      <NewUserForm onCreated={() => qc.invalidateQueries({ queryKey: ["team"] })} />
 
       {isLoading && <div className="text-sm text-muted-foreground">Carregando time...</div>}
       {error && <div className="text-sm text-red">{(error as Error).message}</div>}
@@ -603,6 +597,159 @@ function TeamManager() {
         </div>
       )}
     </div>
+  );
+}
+
+function NewUserForm({ onCreated }: { onCreated: () => void }) {
+  const createFn = useServerFn(createTeamMember);
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [roles, setRoles] = useState<string[]>(["diretoria"]);
+  const [lastCreated, setLastCreated] = useState<{ email: string; password: string } | null>(null);
+
+  const toggleRole = (r: string) =>
+    setRoles((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
+
+  const generatePassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
+    let out = "";
+    const arr = new Uint32Array(14);
+    crypto.getRandomValues(arr);
+    for (let i = 0; i < arr.length; i++) out += chars[arr[i] % chars.length];
+    setPassword(out);
+  };
+
+  const mut = useMutation({
+    mutationFn: () =>
+      createFn({
+        data: {
+          email: email.trim(),
+          password,
+          displayName: displayName.trim() || undefined,
+          roles: roles as ("admin" | "lancador_nf" | "lancador_caixa" | "diretoria")[],
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Usuário criado");
+      setLastCreated({ email: email.trim(), password });
+      setEmail("");
+      setDisplayName("");
+      setPassword("");
+      setRoles(["diretoria"]);
+      onCreated();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (!open) {
+    return (
+      <div className="space-y-3">
+        <button
+          onClick={() => { setOpen(true); setLastCreated(null); }}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-card px-3 py-2 text-sm font-semibold text-gold hover:bg-gold-dim transition-colors"
+        >
+          <UserPlus className="h-4 w-4" /> Adicionar usuário
+        </button>
+        {lastCreated && (
+          <div className="rounded-xl border border-green/40 bg-green-dim/40 p-4 text-sm">
+            <div className="mb-2 font-semibold text-green">Usuário criado — anote a senha:</div>
+            <div className="flex flex-wrap items-center gap-3 font-mono text-foreground">
+              <span>{lastCreated.email}</span>
+              <span>·</span>
+              <span>{lastCreated.password}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${lastCreated.email} / ${lastCreated.password}`);
+                  toast.success("Copiado");
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-xs text-soft-foreground hover:text-gold"
+              >
+                <Copy className="h-3 w-3" /> Copiar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const canSubmit = email.trim().length > 3 && password.length >= 8 && roles.length > 0 && !mut.isPending;
+
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (canSubmit) mut.mutate(); }}
+      className="rounded-xl border border-gold/40 bg-card p-4 space-y-4"
+    >
+      <div className="flex items-center gap-2 text-sm font-semibold text-gold">
+        <UserPlus className="h-4 w-4" /> Novo usuário
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Email">
+          <input
+            type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+            required maxLength={255} autoComplete="off" className={inputCls}
+          />
+        </Field>
+        <Field label="Nome para exibição (opcional)">
+          <input
+            value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={80} className={inputCls}
+          />
+        </Field>
+        <Field label="Senha (mín. 8 caracteres)">
+          <div className="flex gap-2">
+            <input
+              type="text" value={password} onChange={(e) => setPassword(e.target.value)}
+              minLength={8} maxLength={72} required autoComplete="new-password"
+              className={inputCls}
+            />
+            <button
+              type="button" onClick={generatePassword}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-soft-foreground hover:text-gold"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Gerar
+            </button>
+          </div>
+        </Field>
+      </div>
+
+      <div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Papéis</div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {ALL_ROLES.map((r) => (
+            <label key={r} className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-surface p-3 hover:border-gold/40">
+              <input
+                type="checkbox" checked={roles.includes(r)} onChange={() => toggleRole(r)}
+                className="mt-0.5 h-4 w-4 cursor-pointer accent-gold"
+              />
+              <div>
+                <div className="text-sm font-semibold text-foreground">{ROLE_LABELS[r].label}</div>
+                <div className="text-xs text-muted-foreground">{ROLE_LABELS[r].hint}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button
+          type="button" onClick={() => setOpen(false)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-soft-foreground hover:text-foreground"
+        >
+          <X className="h-4 w-4" /> Cancelar
+        </button>
+        <button
+          type="submit" disabled={!canSubmit}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-sm font-bold text-background hover:bg-gold/90 disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" /> {mut.isPending ? "Criando..." : "Criar usuário"}
+        </button>
+      </div>
+    </form>
   );
 }
 
