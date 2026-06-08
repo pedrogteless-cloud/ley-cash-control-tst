@@ -57,10 +57,9 @@ export function CarteiraTab({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let arr = notas.filter((n) => !isEnviado(n));
+    let arr = filter === "Enviados" ? notas.filter(isEnviado) : notas.filter((n) => !isEnviado(n));
     if (filter === "Enviar Cheque") arr = arr.filter(isAEnviar);
     else if (filter === "Aguardando Carga") arr = arr.filter(isAguardando);
-    else if (filter === "Enviados") arr = arr.filter(isEnviado);
     if (q) arr = arr.filter((n) => n.fornecedor.toLowerCase().includes(q) || n.nf.toLowerCase().includes(q));
     return arr;
   }, [filter, search, notas]);
