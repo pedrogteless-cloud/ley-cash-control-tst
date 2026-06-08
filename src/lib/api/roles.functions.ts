@@ -81,3 +81,61 @@ export const setRole = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+export const createTeamMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      email: z.string().trim().email().max(255),
+      password: z.string().min(8).max(72),
+      displayName: z.string().trim().min(1).max(80).optional(),
+      roles: z.array(ROLE).min(1).max(4),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: isAdmin, error: roleErr } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    if (roleErr) throw new Error(roleErr.message);
+    if (!isAdmin) throw new Error("Apenas administradores podem criar usuários.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const displayName = data.displayName ?? data.email.split("@")[0];
+
+    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: { display_name: displayName },
+    });
+    if (createErr || !created?.user) {
+      throw new Error(createErr?.message ?? "Falha ao criar usuário.");
+    }
+
+    const newId = created.user.id;
+    const desired = Array.from(new Set(data.roles));
+
+    // Remove papéis automáticos não pedidos (trigger handle_new_user pode ter inserido 'diretoria' ou 'admin')
+    const { error: delErr } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", newId)
+      .not("role", "in", `(${desired.map((r) => `"${r}"`).join(",")})`);
+    if (delErr) throw new Error(delErr.message);
+
+    // Insere os papéis pedidos (ignora duplicatas)
+    for (const role of desired) {
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .insert({ user_id: newId, role });
+      if (error && !String(error.message).toLowerCase().includes("duplicate")) {
+        throw new Error(error.message);
+      }
+    }
+
+    return { id: newId, email: data.email };
+  });
