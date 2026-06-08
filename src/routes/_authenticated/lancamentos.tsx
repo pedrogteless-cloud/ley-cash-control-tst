@@ -169,7 +169,7 @@ function Lancamentos() {
 
       <button
         onClick={openFab}
-        className="fixed bottom-6 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gold text-background shadow-lg shadow-gold/30 hover:bg-gold/90 sm:right-6"
+        className="fixed bottom-6 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gold text-background shadow-lg shadow-gold/30 transition-transform transition-colors duration-150 hover:bg-gold/90 active:scale-95 sm:right-6"
         aria-label="Novo lançamento"
       >
         <Plus className="h-6 w-6" />
