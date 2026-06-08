@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useStore, type NFRecord, type CaixaRecord } from "@/data/store";
 import { brl } from "@/lib/format";
 import { isEnviar } from "@/data/painel";
-import { listTeam, setRole } from "@/lib/api/roles.functions";
+import { listTeam, setRole, createTeamMember } from "@/lib/api/roles.functions";
 import { useRoles } from "@/hooks/use-role";
 import { supabase } from "@/integrations/supabase/client";
 
