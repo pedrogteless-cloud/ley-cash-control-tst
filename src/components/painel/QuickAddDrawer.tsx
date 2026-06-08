@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Save, X } from "lucide-react";
+import { Save, X, Loader2 } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/drawer";
 import { useStore, type NFRecord, type CaixaRecord } from "@/data/store";
 import { brl, parseBrlInput, formatBrlInput } from "@/lib/format";
+import { useRoles } from "@/hooks/use-role";
 
 type Mode =
   | { kind: "new-nf" }
