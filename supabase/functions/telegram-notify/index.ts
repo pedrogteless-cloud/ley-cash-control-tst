@@ -84,6 +84,8 @@ Deno.serve(async (req) => {
     }
 
     const { table, record } = payload ?? {};
+    const actorName = String(payload?.actor_name ?? "").trim();
+    const actorLine = actorName ? `\n👤 <b>Ação executada por:</b> ${escapeHtml(actorName)}` : "";
 
     if (!record) {
       return new Response(JSON.stringify({ ignored: true }), {
@@ -105,7 +107,7 @@ Deno.serve(async (req) => {
           `💰 <b>Valor:</b> ${escapeHtml(brl(record.valor))}`,
           "",
           "⚠️ <i>Separe os cheques e envie ao fornecedor.</i>",
-        ].join("\n");
+        ].join("\n") + actorLine;
         await sendTelegram(msg);
       } else if (op === "INSERT") {
         const msg = [
@@ -116,7 +118,7 @@ Deno.serve(async (req) => {
           `🧾 <b>NF:</b> ${escapeHtml(record.nf)}`,
           `🏢 <b>Filial:</b> ${escapeHtml(record.filial)}`,
           `💰 <b>Valor:</b> ${escapeHtml(brl(record.valor))}`,
-        ].join("\n");
+        ].join("\n") + actorLine;
         await sendTelegram(msg);
       }
     } else if (table === "caixa_movimentos") {
@@ -137,7 +139,7 @@ Deno.serve(async (req) => {
         record.destino ? `🎯 <b>Destino:</b> ${escapeHtml(record.destino)}` : "",
       ]
         .filter(Boolean)
-        .join("\n");
+        .join("\n") + actorLine;
       await sendTelegram(msg);
     }
 
