@@ -6,6 +6,7 @@ import { brl } from "@/lib/format";
 import { KpiCard } from "./KpiCard";
 import { CaixaCard } from "./CaixaCard";
 import { useStore } from "@/data/store";
+import { isEnviado } from "@/data/painel";
 import { useRoles } from "@/hooks/use-role";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -20,7 +21,7 @@ export function CaixaTab({
   const { canWriteCaixa } = useRoles();
   const canEdit = !readOnly && canWriteCaixa;
   const isMobile = useIsMobile();
-  const totalCarteira = notas.reduce((s, n) => s + n.valor, 0);
+  const totalCarteira = notas.filter((n) => !isEnviado(n)).reduce((s, n) => s + n.valor, 0);
 
   if (!caixa.length) {
     return (

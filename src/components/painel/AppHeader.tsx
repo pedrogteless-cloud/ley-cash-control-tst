@@ -2,13 +2,14 @@ import { Link } from "@tanstack/react-router";
 import { LogOut, Settings2, ClipboardEdit } from "lucide-react";
 import { brl } from "@/lib/format";
 import { useStore } from "@/data/store";
+import { isEnviado } from "@/data/painel";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoles } from "@/hooks/use-role";
 
 export function AppHeader() {
   const { notas, caixa } = useStore();
   const { isAdmin, canWrite } = useRoles();
-  const totalCarteira = notas.reduce((s, n) => s + n.valor, 0);
+  const totalCarteira = notas.filter((n) => !isEnviado(n)).reduce((s, n) => s + n.valor, 0);
   const saldoAtual = caixa.length ? caixa[caixa.length - 1].saldoTotal : 0;
   const cobertura = totalCarteira > 0 ? (saldoAtual / totalCarteira) * 100 : 0;
 
