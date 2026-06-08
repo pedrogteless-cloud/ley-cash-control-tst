@@ -367,11 +367,23 @@ export function useStore() {
     onSuccess: async (data) => {
       toast.success(`Cheque enviado: ${data.fornecedor}`);
       try {
+        const { data: s } = await supabase.auth.getSession();
+        const uid = s.session?.user.id;
+        let usuario: string | undefined;
+        if (uid) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("display_name, email")
+            .eq("id", uid)
+            .maybeSingle();
+          usuario = prof?.display_name || prof?.email || s.session?.user.email || undefined;
+        }
         await supabase.functions.invoke("telegram-notify", {
           body: {
             type: "cheque_enviado",
             notas: [{ fornecedor: data.fornecedor, nf: data.nf, valor: Number(data.valor) }],
             data: todayDDMMYYYY(),
+            usuario,
           },
         });
       } catch (err) {

@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
     if (payload?.type === "cheque_enviado" && Array.isArray(payload.notas)) {
       const notas = payload.notas as NfPayload[];
       const dataStr = String(payload.data ?? "");
+      const usuario = String(payload.usuario ?? "").trim();
 
       // Agrupar por fornecedor
       const groups = new Map<string, { nfs: string[]; total: number }>();
@@ -74,6 +75,7 @@ Deno.serve(async (req) => {
         linhas.push("");
       }
       if (dataStr) linhas.push(`📅 <b>Data:</b> ${escapeHtml(dataStr)}`);
+      if (usuario) linhas.push(`👤 <b>Usuário:</b> ${escapeHtml(usuario)}`);
 
       await sendTelegram(linhas.join("\n"));
       return new Response(JSON.stringify({ ok: true }), {
