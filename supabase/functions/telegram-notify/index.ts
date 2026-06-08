@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
         linhas.push("");
       }
       if (dataStr) linhas.push(`📅 <b>Data:</b> ${escapeHtml(dataStr)}`);
-      if (usuario) linhas.push(`👤 <b>Usuário:</b> ${escapeHtml(usuario)}`);
+      if (usuario) linhas.push(`👤 <b>Ação executada por:</b> ${escapeHtml(usuario)}`);
 
       await sendTelegram(linhas.join("\n"));
       return new Response(JSON.stringify({ ok: true }), {
