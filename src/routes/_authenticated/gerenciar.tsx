@@ -537,13 +537,7 @@ function TeamManager() {
         </h2>
       </div>
 
-      <div className="rounded-xl border border-blue/30 bg-blue-dim/50 p-4 text-sm text-soft-foreground">
-        <div className="mb-1 flex items-center gap-2 font-semibold text-blue">
-          <Shield className="h-4 w-4" /> Como adicionar alguém
-        </div>
-        Peça à pessoa para acessar <span className="font-mono text-foreground">/auth</span> e criar uma conta.
-        Depois volte aqui e marque os papéis dela. Por padrão, novos usuários entram como <b>Diretoria</b> (só leitura).
-      </div>
+      <NewUserForm onCreated={() => qc.invalidateQueries({ queryKey: ["team"] })} />
 
       {isLoading && <div className="text-sm text-muted-foreground">Carregando time...</div>}
       {error && <div className="text-sm text-red">{(error as Error).message}</div>}
