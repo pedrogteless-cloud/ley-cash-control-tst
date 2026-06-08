@@ -55,6 +55,7 @@ export type Database = {
           destino: string | null
           entrada: number
           id: string
+          origem: string
           saida: number
           saldo_anterior: number
           saldo_total: number
@@ -67,6 +68,7 @@ export type Database = {
           destino?: string | null
           entrada?: number
           id?: string
+          origem?: string
           saida?: number
           saldo_anterior?: number
           saldo_total?: number
@@ -79,6 +81,7 @@ export type Database = {
           destino?: string | null
           entrada?: number
           id?: string
+          origem?: string
           saida?: number
           saldo_anterior?: number
           saldo_total?: number
@@ -88,6 +91,7 @@ export type Database = {
       }
       notas_fiscais: {
         Row: {
+          cheque_enviado_em: string | null
           created_at: string
           criado_por: string | null
           entrega: string
@@ -100,6 +104,7 @@ export type Database = {
           valor: number
         }
         Insert: {
+          cheque_enviado_em?: string | null
           created_at?: string
           criado_por?: string | null
           entrega?: string
@@ -112,6 +117,7 @@ export type Database = {
           valor?: number
         }
         Update: {
+          cheque_enviado_em?: string | null
           created_at?: string
           criado_por?: string | null
           entrega?: string
@@ -175,6 +181,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      confirmar_envio_nf: { Args: { p_nf_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
