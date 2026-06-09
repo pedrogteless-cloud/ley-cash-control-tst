@@ -520,7 +520,7 @@ function NfRow({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-end gap-1 border-t border-border/60 pt-2">
-        {canConfirmar && aEnviar && (
+        {canConfirmar && !enviado && (
           <button
             onClick={onConfirmarEnvio}
             disabled={confirmando}
