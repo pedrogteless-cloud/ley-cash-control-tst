@@ -22,10 +22,11 @@ export const Route = createFileRoute("/_authenticated/gerenciar")({
   component: GerenciarPage,
 });
 
-type Tab = "nfs" | "caixa" | "time" | "auditoria";
+type Tab = "nfs" | "caixa" | "devolvidos" | "time" | "auditoria";
 
 function GerenciarPage() {
-  const { isAdmin } = useRoles();
+  const { isAdmin, roles } = useRoles();
+  const canSeeDevolvidos = isAdmin || roles.includes("diretoria");
   const [tab, setTab] = useState<Tab>("nfs");
 
   return (
