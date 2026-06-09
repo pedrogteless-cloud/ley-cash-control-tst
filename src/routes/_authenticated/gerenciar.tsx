@@ -10,6 +10,7 @@ import { isEnviar } from "@/data/painel";
 import { listTeam, setRole, createTeamMember } from "@/lib/api/roles.functions";
 import { useRoles } from "@/hooks/use-role";
 import { supabase } from "@/integrations/supabase/client";
+import { DevolvidosManager } from "@/components/painel/DevolvidosManager";
 
 export const Route = createFileRoute("/_authenticated/gerenciar")({
   head: () => ({
