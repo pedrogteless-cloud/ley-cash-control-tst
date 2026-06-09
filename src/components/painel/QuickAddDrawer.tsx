@@ -289,12 +289,17 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
           <input
             autoFocus
             value={dataStr}
-            onChange={(e) => setDataStr(e.target.value)}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+              const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+              setDataStr(formatted);
+            }}
             inputMode="numeric"
-            maxLength={10}
+            maxLength={5}
             placeholder="01/06"
             className={inputCls(errors.data)}
           />
+
         </Field>
         <Field label="Saldo anterior">
           <input
