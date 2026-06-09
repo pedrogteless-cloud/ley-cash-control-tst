@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NF, CaixaDia } from "@/data/painel";
@@ -106,6 +107,14 @@ export function useStore() {
 
   const invalidateNotas = () => qc.invalidateQueries({ queryKey: QK.notas });
   const invalidateCaixa = () => qc.invalidateQueries({ queryKey: QK.caixa });
+    useEffect(() => {
+    const channel = supabase
+      .channel("store-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "notas_fiscais" }, () => invalidateNotas())
+      .on("postgres_changes", { event: "*", schema: "public", table: "caixa_movimentos" }, () => invalidateCaixa())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   // ============ NF MUTATIONS ============
 
