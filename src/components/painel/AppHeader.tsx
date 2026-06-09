@@ -10,7 +10,11 @@ export function AppHeader() {
   const { notas, caixa } = useStore();
   const { isAdmin, canWrite } = useRoles();
   const totalCarteira = notas.filter((n) => !isEnviado(n)).reduce((s, n) => s + n.valor, 0);
-  const saldoAtual = caixa.length ? caixa[caixa.length - 1].saldoTotal : 0;
+ const saldoAtual = caixa.length
+  ? caixa.reduce((latest, c) =>
+      (c.createdAt ?? "") > (latest.createdAt ?? "") ? c : latest
+    ).saldoTotal
+  : 0;
   const cobertura = totalCarteira > 0 ? (saldoAtual / totalCarteira) * 100 : 0;
 
   return (
