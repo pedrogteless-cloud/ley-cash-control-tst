@@ -112,7 +112,7 @@ export function useStore() {
       .channel("store-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "notas_fiscais" }, () => invalidateNotas())
       .on("postgres_changes", { event: "*", schema: "public", table: "caixa_movimentos" }, () => invalidateCaixa())
-      .subscribe();
+      .subscribe();      .channel(`store-realtime-${Math.random()}`)
     return () => { supabase.removeChannel(channel); };
   }, []);
 
