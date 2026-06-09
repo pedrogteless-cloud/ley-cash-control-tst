@@ -89,6 +89,36 @@ export type Database = {
         }
         Relationships: []
       }
+      cheques_devolvidos: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          data: string
+          id: string
+          valor_devolvido: number
+          valor_rec_empresa: number
+          valor_rec_fornecedor: number
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          data?: string
+          id?: string
+          valor_devolvido?: number
+          valor_rec_empresa?: number
+          valor_rec_fornecedor?: number
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          data?: string
+          id?: string
+          valor_devolvido?: number
+          valor_rec_empresa?: number
+          valor_rec_fornecedor?: number
+        }
+        Relationships: []
+      }
       notas_fiscais: {
         Row: {
           cheque_enviado_em: string | null

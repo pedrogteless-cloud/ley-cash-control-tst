@@ -10,6 +10,7 @@ import { isEnviar } from "@/data/painel";
 import { listTeam, setRole, createTeamMember } from "@/lib/api/roles.functions";
 import { useRoles } from "@/hooks/use-role";
 import { supabase } from "@/integrations/supabase/client";
+import { DevolvidosManager } from "@/components/painel/DevolvidosManager";
 
 export const Route = createFileRoute("/_authenticated/gerenciar")({
   head: () => ({
@@ -21,10 +22,11 @@ export const Route = createFileRoute("/_authenticated/gerenciar")({
   component: GerenciarPage,
 });
 
-type Tab = "nfs" | "caixa" | "time" | "auditoria";
+type Tab = "nfs" | "caixa" | "devolvidos" | "time" | "auditoria";
 
 function GerenciarPage() {
-  const { isAdmin } = useRoles();
+  const { isAdmin, roles } = useRoles();
+  const canSeeDevolvidos = isAdmin || roles.includes("diretoria");
   const [tab, setTab] = useState<Tab>("nfs");
 
   return (
@@ -51,6 +53,7 @@ function GerenciarPage() {
           {([
             { id: "nfs", label: "Notas Fiscais" },
             { id: "caixa", label: "Movimentos de Caixa" },
+            ...(canSeeDevolvidos ? [{ id: "devolvidos" as const, label: "Devolvidos" }] : []),
             ...(isAdmin ? [{ id: "time" as const, label: "Time" }] : []),
             ...(isAdmin ? [{ id: "auditoria" as const, label: "Auditoria" }] : []),
           ] as { id: Tab; label: string }[]).map((t) => (
@@ -72,6 +75,7 @@ function GerenciarPage() {
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         {tab === "nfs" && <NotasManager />}
         {tab === "caixa" && <CaixaManager />}
+        {tab === "devolvidos" && canSeeDevolvidos && <DevolvidosManager />}
         {tab === "time" && isAdmin && <TeamManager />}
         {tab === "auditoria" && isAdmin && <AuditoriaManager />}
       </main>
