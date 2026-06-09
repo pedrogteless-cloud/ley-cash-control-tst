@@ -235,12 +235,16 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
   const todayStr = `${String(today.getDate()).padStart(2, "0")}/${String(
     today.getMonth() + 1,
   ).padStart(2, "0")}`;
+    const parseCaixaData = (d: string) => {
+    if (/^\d{4}-\d{2}-\d{2}/.test(d)) return new Date(d).getTime();
+    const [dd, mm] = d.split("/");
+    return new Date(new Date().getFullYear(), Number(mm) - 1, Number(dd)).getTime();
+  };
   const lastSaldo = caixa.length
-  ? caixa.reduce((latest, c) =>
-      (c.createdAt ?? "") > (latest.createdAt ?? "") ? c : latest
-    ).saldoTotal
-  : 0;
-
+    ? caixa.reduce((latest, c) =>
+        parseCaixaData(c.data ?? "") > parseCaixaData(latest.data ?? "") ? c : latest
+      ).saldoTotal
+    : 0;
   // Saída do dia já lançada (automática via baixa de NF) — exibida apenas como leitura no modo simples
   const saidaHoje = caixa
     .filter((c) => c.data === (initial?.data ?? todayStr))
