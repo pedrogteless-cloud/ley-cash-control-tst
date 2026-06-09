@@ -53,6 +53,7 @@ function GerenciarPage() {
           {([
             { id: "nfs", label: "Notas Fiscais" },
             { id: "caixa", label: "Movimentos de Caixa" },
+            ...(canSeeDevolvidos ? [{ id: "devolvidos" as const, label: "Devolvidos" }] : []),
             ...(isAdmin ? [{ id: "time" as const, label: "Time" }] : []),
             ...(isAdmin ? [{ id: "auditoria" as const, label: "Auditoria" }] : []),
           ] as { id: Tab; label: string }[]).map((t) => (
@@ -74,6 +75,7 @@ function GerenciarPage() {
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         {tab === "nfs" && <NotasManager />}
         {tab === "caixa" && <CaixaManager />}
+        {tab === "devolvidos" && canSeeDevolvidos && <DevolvidosManager />}
         {tab === "time" && isAdmin && <TeamManager />}
         {tab === "auditoria" && isAdmin && <AuditoriaManager />}
       </main>
