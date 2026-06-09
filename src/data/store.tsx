@@ -107,7 +107,7 @@ export function useStore() {
 
   const invalidateNotas = () => qc.invalidateQueries({ queryKey: QK.notas });
   const invalidateCaixa = () => qc.invalidateQueries({ queryKey: QK.caixa });
-     useEffect(() => {
+      useEffect(() => {
     const channel = supabase
       .channel(`store-realtime-${Math.random()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "notas_fiscais" }, () => invalidateNotas())
