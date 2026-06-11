@@ -1,6 +1,7 @@
 // Telegram notification edge function
-// Invoked by Postgres triggers (via pg_net) on inserts to notas_fiscais and caixa_movimentos,
-// and pelo cliente quando um cheque é confirmado como enviado.
+// Invoked by Postgres triggers (via pg_net) on inserts to notas_fiscais,
+// caixa_movimentos and cheques_devolvidos, and pelo cliente quando um
+// cheque é confirmado como enviado.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
