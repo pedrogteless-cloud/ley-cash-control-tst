@@ -35,7 +35,7 @@ export function KpiCard({
           <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${t.bg} ${t.fg}`}>{icon}</div>
         )}
       </div>
-      <div className={`mt-2 text-xl font-bold sm:text-2xl ${t.fg}`}>{value}</div>
+      <div className={`mt-2 whitespace-nowrap text-lg font-bold sm:text-xl xl:text-2xl ${t.fg}`}>{value}</div>
       {hint && <div className="mt-1 text-xs text-soft-foreground">{hint}</div>}
       {explain && (
         <div className="mt-1.5 text-[11px] leading-snug text-muted-foreground sm:hidden">
