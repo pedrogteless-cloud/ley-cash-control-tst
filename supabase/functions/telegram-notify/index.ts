@@ -5,11 +5,12 @@
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-telegram-secret",
 };
 
 const TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID");
+const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
 
 const brl = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(n) || 0);
@@ -47,30 +48,58 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
+    const serverOriginated = payload?.type === "devolvido_atualizado" || typeof payload?.table === "string";
+    if (serverOriginated && WEBHOOK_SECRET && req.headers.get("x-telegram-secret") !== WEBHOOK_SECRET) {
+      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // ============ Devolvido atualizado (chamado via RPC/pg_net) ============
     if (payload?.type === "devolvido_atualizado") {
-      const { data, rec_fornecedor, rec_empresa, total_recuperado_novo, total_recuperado_acumulado, pendente } = payload ?? {};
+      const {
+        data,
+        rec_fornecedor,
+        rec_empresa,
+        rec_fornecedor_delta,
+        rec_empresa_delta,
+        total_recuperado_novo,
+        total_recuperado_delta,
+        total_recuperado_lancamento,
+        total_recuperado_acumulado,
+        pendente,
+        pendente_lancamento,
+        pendente_acumulado,
+      } = payload ?? {};
 
       // Format YYYY-MM-DD → DD/MM/YYYY
       const parts = String(data ?? "").split("-");
       const dataFmt = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : String(data ?? "");
+      const recFornecedorNovo = rec_fornecedor_delta ?? rec_fornecedor;
+      const recEmpresaNovo = rec_empresa_delta ?? rec_empresa;
+      const totalNovo = total_recuperado_delta ?? total_recuperado_novo ?? 0;
+      const totalLancamento = total_recuperado_lancamento ?? total_recuperado_novo ?? 0;
+      const pendenteLancamento = pendente_lancamento ?? pendente ?? 0;
+      const pendenteAcumulado = pendente_acumulado ?? pendente ?? 0;
 
       const linhas: string[] = [
         "♻️ <b>Recuperação de cheque atualizada — Grupo Ley</b>",
         "",
         `📅 <b>Lançamento de:</b> ${escapeHtml(dataFmt)}`,
       ];
-      if (rec_fornecedor !== null && rec_fornecedor !== undefined) {
-        linhas.push(`💰 <b>Rec. fornecedor:</b> ${escapeHtml(brl(Number(rec_fornecedor)))}`);
+      if (recFornecedorNovo !== null && recFornecedorNovo !== undefined) {
+        linhas.push(`💰 <b>Novo rec. fornecedor:</b> ${escapeHtml(brl(Number(recFornecedorNovo)))}`);
       }
-      if (rec_empresa !== null && rec_empresa !== undefined) {
-        linhas.push(`🏢 <b>Rec. empresa (Ley):</b> ${escapeHtml(brl(Number(rec_empresa)))}`);
+      if (recEmpresaNovo !== null && recEmpresaNovo !== undefined) {
+        linhas.push(`🏢 <b>Novo rec. empresa (Ley):</b> ${escapeHtml(brl(Number(recEmpresaNovo)))}`);
       }
       linhas.push("");
-      linhas.push(`✅ <b>Total recuperado (este lançamento):</b> ${escapeHtml(brl(Number(total_recuperado_novo ?? 0)))}`);
+      linhas.push(`✅ <b>Total recuperado agora:</b> ${escapeHtml(brl(Number(totalNovo)))}`);
+      linhas.push(`🧾 <b>Recuperado no lançamento:</b> ${escapeHtml(brl(Number(totalLancamento)))}`);
+      linhas.push(`⏳ <b>Pendente no lançamento:</b> ${escapeHtml(brl(Number(pendenteLancamento)))}`);
       linhas.push(`📊 <b>Total acumulado:</b> ${escapeHtml(brl(Number(total_recuperado_acumulado ?? 0)))}`);
-      linhas.push(`⏳ <b>Pendente acumulado:</b> ${escapeHtml(brl(Number(pendente ?? 0)))}`);
+      linhas.push(`⏳ <b>Pendente acumulado:</b> ${escapeHtml(brl(Number(pendenteAcumulado)))}`);
 
       await sendTelegram(linhas.join("\n"));
       return new Response(JSON.stringify({ ok: true }), {

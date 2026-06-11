@@ -48,6 +48,14 @@ const emptyForm = (): FormState => ({
   valor_rec_empresa: 0,
 });
 
+const mutationMessage = (e: Error) => {
+  if (e.message.includes("invalid_money_values")) return "Informe valores válidos";
+  if (e.message.includes("recovered_exceeds_devolvido")) {
+    return "O total recuperado não pode ser maior que o valor devolvido";
+  }
+  return e.message;
+};
+
 function ymKey(iso: string) {
   return iso.slice(0, 7);
 }
@@ -114,7 +122,7 @@ export function DevolvidosManager() {
       qc.invalidateQueries({ queryKey: ["cheques_devolvidos"] });
       setForm(emptyForm());
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(mutationMessage(e)),
   });
 
   // ── Update mutation (via RPC for server-side Telegram decision) ──────────
@@ -135,7 +143,7 @@ export function DevolvidosManager() {
       setEditingId(null);
       setForm(emptyForm());
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(mutationMessage(e)),
   });
 
   // ── Delete mutation ──────────────────────────────────────────────────────
@@ -144,11 +152,11 @@ export function DevolvidosManager() {
       const { error } = await supabase.from("cheques_devolvidos").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, deletedId) => {
       toast.success("Lançamento removido");
       qc.invalidateQueries({ queryKey: ["cheques_devolvidos"] });
       setDeleteTarget(null);
-      if (editingId === deleteTarget?.id) {
+      if (editingId === deletedId) {
         setEditingId(null);
         setForm(emptyForm());
       }
@@ -164,6 +172,27 @@ export function DevolvidosManager() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.data) return;
+    if (
+      !Number.isFinite(form.valor_devolvido) ||
+      !Number.isFinite(form.valor_rec_fornecedor) ||
+      !Number.isFinite(form.valor_rec_empresa)
+    ) {
+      toast.error("Informe valores válidos");
+      return;
+    }
+    if (
+      form.valor_devolvido < 0 ||
+      form.valor_rec_fornecedor < 0 ||
+      form.valor_rec_empresa < 0
+    ) {
+      toast.error("Os valores não podem ser negativos");
+      return;
+    }
+    const totalRecuperado = form.valor_rec_fornecedor + form.valor_rec_empresa;
+    if (totalRecuperado > form.valor_devolvido) {
+      toast.error("O total recuperado não pode ser maior que o valor devolvido");
+      return;
+    }
     const noValues =
       form.valor_devolvido <= 0 &&
       form.valor_rec_fornecedor <= 0 &&
@@ -424,7 +453,8 @@ function EntriesTable({
                       </button>
                       <button
                         onClick={() => onDelete(r)}
-                        className="rounded-md p-1.5 text-red transition-colors hover:bg-red-dim"
+                        disabled={isActive}
+                        className="rounded-md p-1.5 text-red transition-colors hover:bg-red-dim disabled:opacity-40"
                         aria-label="Excluir"
                       >
                         <Trash2 className="h-4 w-4" />
