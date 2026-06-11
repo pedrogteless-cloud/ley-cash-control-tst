@@ -240,11 +240,18 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
     const [dd, mm] = d.split("/");
     return new Date(new Date().getFullYear(), Number(mm) - 1, Number(dd)).getTime();
   };
-  const lastSaldo = caixa.length
-    ? caixa.reduce((latest, c) =>
-        parseCaixaData(c.data ?? "") > parseCaixaData(latest.data ?? "") ? c : latest
-      ).saldoTotal
-    : 0;
+  const saldoParaData = (ddmm: string) => {
+    if (!/^\d{2}\/\d{2}$/.test(ddmm)) return 0;
+    const target = parseCaixaData(ddmm);
+    const prev = [...caixa]
+      .filter((c) => parseCaixaData(c.data ?? "") <= target)
+      .sort((a, b) => {
+        const diff = parseCaixaData(b.data ?? "") - parseCaixaData(a.data ?? "");
+        return diff !== 0 ? diff : (b.createdAt ?? "") > (a.createdAt ?? "") ? 1 : -1;
+      })[0];
+    return prev?.saldoTotal ?? 0;
+  };
+
   // Saída do dia já lançada (automática via baixa de NF) — exibida apenas como leitura no modo simples
   const saidaHoje = caixa
     .filter((c) => c.data === (initial?.data ?? todayStr))
@@ -252,8 +259,14 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
 
   const [dataStr, setDataStr] = useState(initial?.data ?? todayStr);
   const [saldoAntStr, setSaldoAntStr] = useState(
-    formatBrlInput(initial?.saldoAnterior ?? lastSaldo),
+    formatBrlInput(initial?.saldoAnterior ?? saldoParaData(initial?.data ?? todayStr)),
   );
+
+  useEffect(() => {
+    if (initial) return;
+    setSaldoAntStr(formatBrlInput(saldoParaData(dataStr)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataStr]);
   const [entradaStr, setEntradaStr] = useState(formatBrlInput(initial?.entrada ?? 0));
   const [saidaStr, setSaidaStr] = useState(formatBrlInput(initial?.saida ?? 0));
   const [destino, setDestino] = useState(initial?.destino ?? "");

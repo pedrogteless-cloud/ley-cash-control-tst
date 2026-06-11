@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Search, History, UserPlus, Copy, RefreshCw } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -312,6 +312,12 @@ function NotaForm({
 
 /* ------------- Caixa ------------- */
 
+const parseDateDDMM = (d: string): number => {
+  if (!d || !/^\d{2}\/\d{2}$/.test(d)) return 0;
+  const [dd, mm] = d.split("/");
+  return new Date(new Date().getFullYear(), Number(mm) - 1, Number(dd)).getTime();
+};
+
 const emptyCaixa = {
   data: "",
   saldoAnterior: 0,
@@ -387,6 +393,8 @@ function CaixaManager() {
           initial={initial}
           onCancel={() => setEditing(null)}
           onSave={handleSubmit}
+          caixa={caixa}
+          isNew={editing === "new"}
         />
       )}
 
@@ -442,13 +450,31 @@ function CaixaForm({
   initial,
   onSave,
   onCancel,
+  caixa = [],
+  isNew = false,
 }: {
   initial: typeof emptyCaixa;
   onSave: (d: typeof emptyCaixa) => void;
   onCancel: () => void;
+  caixa?: CaixaRecord[];
+  isNew?: boolean;
 }) {
   const [form, setForm] = useState(initial);
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    if (!isNew || !caixa.length) return;
+    const target = parseDateDDMM(form.data);
+    if (!target) return;
+    const prev = [...caixa]
+      .filter((c) => parseDateDDMM(c.data) <= target)
+      .sort((a, b) => {
+        const diff = parseDateDDMM(b.data) - parseDateDDMM(a.data);
+        return diff !== 0 ? diff : (b.createdAt ?? "") > (a.createdAt ?? "") ? 1 : -1;
+      })[0];
+    if (prev) set("saldoAnterior", prev.saldoTotal);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.data]);
 
   // Cálculo automático do saldo total
   const totalCalc = form.saldoAnterior + form.entrada - form.saida;
