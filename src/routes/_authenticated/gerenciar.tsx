@@ -11,6 +11,10 @@ import { listTeam, setRole, createTeamMember } from "@/lib/api/roles.functions";
 import { useRoles } from "@/hooks/use-role";
 import { supabase } from "@/integrations/supabase/client";
 import { DevolvidosManager } from "@/components/painel/DevolvidosManager";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/gerenciar")({
   head: () => ({
@@ -97,6 +101,7 @@ const emptyNota = {
 function NotasManager() {
   const { notas, addNota, updateNota, removeNota } = useStore();
   const [editing, setEditing] = useState<NFRecord | "new" | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<NFRecord | null>(null);
   const [search, setSearch] = useState("");
   const [filial, setFilial] = useState<string>("Todas");
 
@@ -218,7 +223,7 @@ function NotasManager() {
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => confirm(`Remover NF ${n.nf}?`) && removeNota(n.id)}
+                          onClick={() => setDeleteTarget(n)}
                           className="rounded-md p-1.5 text-red hover:bg-red-dim transition-colors"
                           aria-label="Remover"
                         >
@@ -238,6 +243,26 @@ function NotasManager() {
           </table>
         </div>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover NF {deleteTarget?.nf}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <><strong>{deleteTarget.fornecedor}</strong> — {brl(deleteTarget.valor)}. Esta ação não pode ser desfeita.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="active:scale-95 transition-transform">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deleteTarget) removeNota(deleteTarget.id); setDeleteTarget(null); }}
+              className="bg-red text-background hover:bg-red/90 active:scale-95 transition-transform"
+            >Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -330,6 +355,7 @@ const emptyCaixa = {
 function CaixaManager() {
   const { caixa, addCaixa, updateCaixa, removeCaixa } = useStore();
   const [editing, setEditing] = useState<CaixaRecord | "new" | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CaixaRecord | null>(null);
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -426,7 +452,7 @@ function CaixaManager() {
                       <button onClick={() => setEditing(c)} className="rounded-md p-1.5 text-blue hover:bg-blue-dim" aria-label="Editar">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button onClick={() => confirm(`Remover dia ${c.data}?`) && removeCaixa(c.id)} className="rounded-md p-1.5 text-red hover:bg-red-dim" aria-label="Remover">
+                      <button onClick={() => setDeleteTarget(c)} className="rounded-md p-1.5 text-red hover:bg-red-dim" aria-label="Remover">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -442,6 +468,26 @@ function CaixaManager() {
           </table>
         </div>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover movimento de {deleteTarget?.data}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>Destino: <strong>{deleteTarget.destino || "—"}</strong>. Esta ação não pode ser desfeita.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="active:scale-95 transition-transform">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deleteTarget) removeCaixa(deleteTarget.id); setDeleteTarget(null); }}
+              className="bg-red text-background hover:bg-red/90 active:scale-95 transition-transform"
+            >Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

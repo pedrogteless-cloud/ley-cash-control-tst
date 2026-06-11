@@ -212,6 +212,16 @@ export type Database = {
     }
     Functions: {
       confirmar_envio_nf: { Args: { p_nf_id: string }; Returns: Json }
+      update_devolvido: {
+        Args: {
+          p_id: string
+          p_data: string
+          p_valor_devolvido: number
+          p_valor_rec_fornecedor: number
+          p_valor_rec_empresa: number
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

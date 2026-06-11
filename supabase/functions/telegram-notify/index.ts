@@ -48,7 +48,37 @@ Deno.serve(async (req) => {
   try {
     const payload = await req.json();
 
-    // ============ NOVO: Cheque enviado (chamado pelo cliente) ============
+    // ============ Devolvido atualizado (chamado via RPC/pg_net) ============
+    if (payload?.type === "devolvido_atualizado") {
+      const { data, rec_fornecedor, rec_empresa, total_recuperado_novo, total_recuperado_acumulado, pendente } = payload ?? {};
+
+      // Format YYYY-MM-DD → DD/MM/YYYY
+      const parts = String(data ?? "").split("-");
+      const dataFmt = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : String(data ?? "");
+
+      const linhas: string[] = [
+        "♻️ <b>Recuperação de cheque atualizada — Grupo Ley</b>",
+        "",
+        `📅 <b>Lançamento de:</b> ${escapeHtml(dataFmt)}`,
+      ];
+      if (rec_fornecedor !== null && rec_fornecedor !== undefined) {
+        linhas.push(`💰 <b>Rec. fornecedor:</b> ${escapeHtml(brl(Number(rec_fornecedor)))}`);
+      }
+      if (rec_empresa !== null && rec_empresa !== undefined) {
+        linhas.push(`🏢 <b>Rec. empresa (Ley):</b> ${escapeHtml(brl(Number(rec_empresa)))}`);
+      }
+      linhas.push("");
+      linhas.push(`✅ <b>Total recuperado (este lançamento):</b> ${escapeHtml(brl(Number(total_recuperado_novo ?? 0)))}`);
+      linhas.push(`📊 <b>Total acumulado:</b> ${escapeHtml(brl(Number(total_recuperado_acumulado ?? 0)))}`);
+      linhas.push(`⏳ <b>Pendente acumulado:</b> ${escapeHtml(brl(Number(pendente ?? 0)))}`);
+
+      await sendTelegram(linhas.join("\n"));
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ============ Cheque enviado (chamado pelo cliente) ============
     if (payload?.type === "cheque_enviado" && Array.isArray(payload.notas)) {
       const notas = payload.notas as NfPayload[];
       const dataStr = String(payload.data ?? "");
