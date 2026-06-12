@@ -56,6 +56,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ============ Resumo geral (disparado pelo botão no painel) ============
+    if (payload?.type === "resumo_geral") {
+      const { carteira_valor, carteira_notas, saldo_caixa, usuario } = payload ?? {};
+      const cobertura = Number(carteira_valor) > 0
+        ? ((Number(saldo_caixa) / Number(carteira_valor)) * 100).toFixed(0)
+        : "—";
+
+      const now = new Date();
+      const dataBR = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+      const horaBR = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+      const linhas = [
+        "📊 <b>Status Geral — Grupo Ley</b>",
+        "",
+        `📅 <b>${escapeHtml(dataBR)} · ${horaBR}</b>`,
+        "",
+        `💼 <b>Carteira a enviar:</b>  ${escapeHtml(brl(Number(carteira_valor)))}  <i>(${escapeHtml(String(carteira_notas))} nota${Number(carteira_notas) === 1 ? "" : "s"})</i>`,
+        `💵 <b>Saldo em casa:</b>  ${escapeHtml(brl(Number(saldo_caixa)))}`,
+        `🎯 <b>Cobertura:</b>  ${escapeHtml(cobertura)}%`,
+      ];
+      if (usuario) linhas.push("", `👤 <b>Solicitado por:</b> ${escapeHtml(String(usuario))}`);
+
+      await sendTelegram(linhas.join("\n"));
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ============ Devolvido atualizado (chamado via RPC/pg_net) ============
     if (payload?.type === "devolvido_atualizado") {
       const {

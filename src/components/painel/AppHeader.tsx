@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { LogOut, Settings2, ClipboardEdit } from "lucide-react";
+import { LogOut, Settings2, ClipboardEdit, BarChart2, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { brl } from "@/lib/format";
 import { useStore } from "@/data/store";
 import { isEnviado } from "@/data/painel";
@@ -9,6 +11,41 @@ import { useRoles } from "@/hooks/use-role";
 export function AppHeader() {
   const { notas, caixa } = useStore();
   const { isAdmin, canWrite } = useRoles();
+  const [sendingStatus, setSendingStatus] = useState(false);
+
+  const enviarStatus = async () => {
+    setSendingStatus(true);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const uid = s.session?.user.id;
+      let usuario: string | undefined;
+      if (uid) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("display_name, email")
+          .eq("id", uid)
+          .maybeSingle();
+        usuario = prof?.display_name || prof?.email || s.session?.user.email || undefined;
+      }
+      const carteiraNFs = notas.filter((n) => !isEnviado(n));
+      const { error } = await supabase.functions.invoke("telegram-notify", {
+        body: {
+          type: "resumo_geral",
+          carteira_valor: carteiraNFs.reduce((s, n) => s + n.valor, 0),
+          carteira_notas: carteiraNFs.length,
+          saldo_caixa: saldoAtual,
+          usuario,
+        },
+      });
+      if (error) throw error;
+      toast.success("Status enviado ao Telegram ✅");
+    } catch (e) {
+      toast.error("Erro ao enviar status");
+      console.error(e);
+    } finally {
+      setSendingStatus(false);
+    }
+  };
   const totalCarteira = notas.filter((n) => !isEnviado(n)).reduce((s, n) => s + n.valor, 0);
   // caixa já vem ordenado (data ASC, created_at ASC) e com saldos derivados
   // via computeChain() no store — o último elemento é sempre o saldo correto.
@@ -30,6 +67,19 @@ export function AppHeader() {
               >
                 <ClipboardEdit className="h-3.5 w-3.5" /> Lançar
               </Link>
+            )}
+            {isAdmin && (
+              <button
+                onClick={enviarStatus}
+                disabled={sendingStatus}
+                title="Enviar resumo ao Telegram"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-blue hover:border-blue/40 transition-colors disabled:opacity-50"
+              >
+                {sendingStatus
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <BarChart2 className="h-3.5 w-3.5" />}
+                Status
+              </button>
             )}
             {isAdmin && (
               <Link
