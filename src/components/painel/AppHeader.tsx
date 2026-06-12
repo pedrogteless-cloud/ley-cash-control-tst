@@ -10,16 +10,9 @@ export function AppHeader() {
   const { notas, caixa } = useStore();
   const { isAdmin, canWrite } = useRoles();
   const totalCarteira = notas.filter((n) => !isEnviado(n)).reduce((s, n) => s + n.valor, 0);
-   const parseCaixaData = (d: string) => {
-    if (/^\d{4}-\d{2}-\d{2}/.test(d)) return new Date(d).getTime();
-    const [dd, mm] = d.split("/");
-    return new Date(new Date().getFullYear(), Number(mm) - 1, Number(dd)).getTime();
-  };
-  const saldoAtual = caixa.length
-    ? caixa.reduce((latest, c) =>
-        parseCaixaData(c.data ?? "") > parseCaixaData(latest.data ?? "") ? c : latest
-      ).saldoTotal
-    : 0;
+  // caixa já vem ordenado (data ASC, created_at ASC) e com saldos derivados
+  // via computeChain() no store — o último elemento é sempre o saldo correto.
+  const saldoAtual = caixa.length ? caixa[caixa.length - 1].saldoTotal : 0;
   const cobertura = totalCarteira > 0 ? (saldoAtual / totalCarteira) * 100 : 0;
 
   return (

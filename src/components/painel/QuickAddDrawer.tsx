@@ -235,38 +235,40 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
   const todayStr = `${String(today.getDate()).padStart(2, "0")}/${String(
     today.getMonth() + 1,
   ).padStart(2, "0")}`;
-    const parseCaixaData = (d: string) => {
+
+  const parseCaixaData = (d: string) => {
     if (/^\d{4}-\d{2}-\d{2}/.test(d)) return new Date(d).getTime();
     const [dd, mm] = d.split("/");
     return new Date(new Date().getFullYear(), Number(mm) - 1, Number(dd)).getTime();
   };
-  const saldoParaData = (ddmm: string) => {
+
+  /**
+   * Saldo anterior derivado: pega o saldo_total do último movimento
+   * anterior à data indicada (já computado via computeChain no store).
+   * Para o primeiro registro de todos usa o saldo_anterior do primeiro
+   * registro (o "saldo de abertura").
+   */
+  const saldoAnteriorDerived = (ddmm: string): number => {
     if (!/^\d{2}\/\d{2}$/.test(ddmm)) return 0;
     const target = parseCaixaData(ddmm);
-    const prev = [...caixa]
-      .filter((c) => parseCaixaData(c.data ?? "") <= target)
-      .sort((a, b) => {
-        const diff = parseCaixaData(b.data ?? "") - parseCaixaData(a.data ?? "");
-        return diff !== 0 ? diff : (b.createdAt ?? "") > (a.createdAt ?? "") ? 1 : -1;
-      })[0];
-    return prev?.saldoTotal ?? 0;
+    // Movimentos estritamente anteriores à data (exclui o próprio registro em edição)
+    const anteriores = caixa.filter((c) => {
+      if (initial && c.id === initial.id) return false;
+      return parseCaixaData(c.data ?? "") < target;
+    });
+    if (!anteriores.length) {
+      // Sem histórico anterior: usa saldo_anterior do primeiro registro geral como seed
+      return caixa[0]?.saldoAnterior ?? 0;
+    }
+    return anteriores[anteriores.length - 1].saldoTotal;
   };
 
-  // Saída do dia já lançada (automática via baixa de NF) — exibida apenas como leitura no modo simples
+  // Saídas automáticas do dia (para modo simples)
   const saidaHoje = caixa
-    .filter((c) => c.data === (initial?.data ?? todayStr))
+    .filter((c) => c.data === (initial?.data ?? todayStr) && (!initial || c.id !== initial.id))
     .reduce((s, c) => s + c.saida, 0);
 
   const [dataStr, setDataStr] = useState(initial?.data ?? todayStr);
-  const [saldoAntStr, setSaldoAntStr] = useState(
-    formatBrlInput(initial?.saldoAnterior ?? saldoParaData(initial?.data ?? todayStr)),
-  );
-
-  useEffect(() => {
-    if (initial) return;
-    setSaldoAntStr(formatBrlInput(saldoParaData(dataStr)));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataStr]);
   const [entradaStr, setEntradaStr] = useState(formatBrlInput(initial?.entrada ?? 0));
   const [saidaStr, setSaidaStr] = useState(formatBrlInput(initial?.saida ?? 0));
   const [destino, setDestino] = useState(initial?.destino ?? "");
@@ -276,10 +278,10 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
   // Editing existing record always uses full form. Non-admin lancador_caixa: simplified.
   const modoSimples = !isAdmin && !initial;
 
-  const ant = parseBrlInput(saldoAntStr);
+  const saldoAnt = saldoAnteriorDerived(dataStr);
   const ent = parseBrlInput(entradaStr);
-  const sai = modoSimples ? 0 : parseBrlInput(saidaStr);
-  const total = modoSimples ? ant + ent - saidaHoje : ant + ent - sai;
+  const sai = modoSimples ? saidaHoje : parseBrlInput(saidaStr);
+  const total = Math.round((saldoAnt + ent - sai) * 100) / 100;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -290,10 +292,10 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
 
     const payload = {
       data: dataStr.trim().slice(0, 10),
-      saldoAnterior: ant,
+      saldoAnterior: saldoAnt,
       entrada: ent,
       saida: sai,
-      saldoTotal: modoSimples ? ant + ent : ant + ent - sai,
+      saldoTotal: total,
       destino: destino.trim() ? destino.trim().slice(0, 100) : undefined,
     };
     setSaving(true);
@@ -305,33 +307,21 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Data (DD/MM)" error={errors.data}>
-          <input
-            autoFocus
-            value={dataStr}
-            onChange={(e) => {
-              const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
-              const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
-              setDataStr(formatted);
-            }}
-            inputMode="numeric"
-            maxLength={5}
-            placeholder="01/06"
-            className={inputCls(errors.data)}
-          />
-
-        </Field>
-        <Field label="Saldo anterior">
-          <input
-            value={saldoAntStr}
-            onChange={(e) => setSaldoAntStr(e.target.value)}
-            inputMode="decimal"
-            className={inputCls()}
-            placeholder="0,00"
-          />
-        </Field>
-      </div>
+      <Field label="Data (DD/MM)" error={errors.data}>
+        <input
+          autoFocus
+          value={dataStr}
+          onChange={(e) => {
+            const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+            const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+            setDataStr(formatted);
+          }}
+          inputMode="numeric"
+          maxLength={5}
+          placeholder="01/06"
+          className={inputCls(errors.data)}
+        />
+      </Field>
 
       {modoSimples ? (
         <>
@@ -390,10 +380,20 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
       )}
 
       <div className="rounded-lg border border-border bg-surface px-3 py-2">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Saldo total (calculado)
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Saldo total (calculado)
+            </div>
+            <div className="text-lg font-bold text-green">{brl(total)}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Saldo anterior
+            </div>
+            <div className="text-sm font-semibold text-soft-foreground">{brl(saldoAnt)}</div>
+          </div>
         </div>
-        <div className="text-lg font-bold text-green">{brl(total)}</div>
       </div>
 
       <FooterButtons saving={saving} onCancel={onDone} />

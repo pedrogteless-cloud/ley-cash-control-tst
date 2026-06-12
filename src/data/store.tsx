@@ -57,6 +57,25 @@ const mapCaixa = (r: CaixaRow): CaixaRecord => ({
   createdAt: r.created_at,
 });
 
+/**
+ * Deriva saldo_anterior e saldo_total em cadeia a partir dos dados brutos.
+ * Seed = saldo_anterior da primeira linha (único valor que o usuário controla).
+ * Todas as linhas subsequentes são recalculadas, garantindo consistência mesmo
+ * após edições, inserções retroativas ou exclusões.
+ */
+function computeChain(rows: CaixaRecord[]): CaixaRecord[] {
+  if (!rows.length) return [];
+  const result: CaixaRecord[] = [];
+  let running = rows[0].saldoAnterior; // seed
+  for (const row of rows) {
+    const saldoAnterior = running;
+    const saldoTotal = Math.round((saldoAnterior + row.entrada - row.saida) * 100) / 100;
+    result.push({ ...row, saldoAnterior, saldoTotal });
+    running = saldoTotal;
+  }
+  return result;
+}
+
 const QK = {
   notas: ["notas_fiscais"] as const,
   caixa: ["caixa_movimentos"] as const,
@@ -101,7 +120,7 @@ export function useStore() {
         .order("data", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data as CaixaRow[]).map(mapCaixa);
+      return computeChain((data as CaixaRow[]).map(mapCaixa));
     },
   });
 
@@ -217,6 +236,8 @@ export function useStore() {
   const addCaixaM = useMutation({
     mutationFn: async (c: Omit<CaixaRecord, "id">) => {
       const { data: s } = await supabase.auth.getSession();
+      // Persiste saldo_anterior e saldo_total para que confirmar_envio_nf
+      // (RPC Postgres) ainda encontre valores válidos no banco.
       const { error } = await supabase.from("caixa_movimentos").insert({
         data: c.data,
         saldo_anterior: c.saldoAnterior,
@@ -235,7 +256,10 @@ export function useStore() {
         id: `optimistic-${Date.now()}`,
         createdAt: new Date().toISOString(),
       };
-      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) => [...(old ?? []), optimistic]);
+      // Insere e recalcula cadeia para posicionar corretamente por data
+      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) =>
+        computeChain([...(old ?? []), optimistic]),
+      );
       return { prev };
     },
     onError: (e: Error, _v, ctx) => {
@@ -248,14 +272,14 @@ export function useStore() {
 
   const updateCaixaM = useMutation({
     mutationFn: async ({ id, c }: { id: string; c: Omit<CaixaRecord, "id"> }) => {
+      // Só enviamos os campos que o usuário edita.
+      // saldo_anterior e saldo_total são derivados via computeChain no fetch.
       const { error } = await supabase
         .from("caixa_movimentos")
         .update({
           data: c.data,
-          saldo_anterior: c.saldoAnterior,
           entrada: c.entrada,
           saida: c.saida,
-          saldo_total: c.saldoTotal,
           destino: c.destino ?? null,
         })
         .eq("id", id);
@@ -263,8 +287,9 @@ export function useStore() {
     },
     onMutate: async ({ id, c }) => {
       const prev = await snapshot<CaixaRecord[]>(qc, QK.caixa);
+      // Optimistic: aplica edição e recalcula cadeia inteira
       qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) =>
-        (old ?? []).map((x) => (x.id === id ? { ...x, ...c } : x)),
+        computeChain((old ?? []).map((x) => (x.id === id ? { ...x, ...c } : x))),
       );
       return { prev };
     },
@@ -284,7 +309,10 @@ export function useStore() {
     onMutate: async (id) => {
       const prev = await snapshot<CaixaRecord[]>(qc, QK.caixa);
       const removed = (prev ?? []).find((c) => c.id === id);
-      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) => (old ?? []).filter((c) => c.id !== id));
+      // Remove e recalcula cadeia para todos os movimentos restantes
+      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) =>
+        computeChain((old ?? []).filter((c) => c.id !== id)),
+      );
       return { prev, removed };
     },
     onError: (e: Error, _v, ctx) => {
@@ -341,28 +369,21 @@ export function useStore() {
               : c.destino.includes(nf.fornecedor)
                 ? c.destino
                 : `${c.destino} + ${nf.fornecedor}`;
-          arr[idx.i] = {
-            ...c,
-            saida: novaSaida,
-            saldoTotal: c.saldoAnterior + c.entrada - novaSaida,
-            destino: novoDestino,
-          };
+          arr[idx.i] = { ...c, saida: novaSaida, destino: novoDestino };
         } else {
-          const last = arr[arr.length - 1];
-          const saldoAnt = last?.saldoTotal ?? 0;
           arr.push({
             id: `optimistic-${Date.now()}`,
             data: hoje,
-            saldoAnterior: saldoAnt,
+            saldoAnterior: 0, // será corrigido pelo computeChain abaixo
             entrada: 0,
             saida: nf.valor,
-            saldoTotal: saldoAnt - nf.valor,
+            saldoTotal: 0,    // idem
             destino: nf.fornecedor,
             origem: "auto_nf",
             createdAt: nowIso,
           });
         }
-        return arr;
+        return computeChain(arr);
       });
 
       return { prevNotas, prevCaixa, nf };
