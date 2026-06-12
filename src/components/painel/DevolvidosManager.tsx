@@ -318,7 +318,11 @@ export function DevolvidosManager() {
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiBox label="Voltou este mês" value={brl(totals.voltou)} tone="text-red" />
         <KpiBox label="Recuperado" value={brl(totals.recuperado)} tone="text-blue" />
-        <KpiBox label="Pendente" value={brl(totals.pendente)} tone="text-gold" />
+        <KpiBox
+          label="Pendente"
+          value={totals.pendente <= 0 ? "✓ Tudo quitado" : brl(totals.pendente)}
+          tone={totals.pendente <= 0 ? "text-green" : totals.pendente >= totals.voltou ? "text-red" : "text-gold"}
+        />
       </div>
 
       {/* ── Tabela: mês atual (detalhe) ──────────────────────────────────── */}
@@ -414,32 +418,44 @@ function EntriesTable({
           </thead>
           <tbody>
             {rows.map((r) => {
-              const pend =
-                Number(r.valor_devolvido) -
-                Number(r.valor_rec_fornecedor) -
-                Number(r.valor_rec_empresa);
+              const devolvido = Number(r.valor_devolvido);
+              const recF = Number(r.valor_rec_fornecedor);
+              const recE = Number(r.valor_rec_empresa);
+              const pend = devolvido - recF - recE;
+              const quitado = pend <= 0;
+              const semRecuperacao = recF === 0 && recE === 0 && devolvido > 0;
               const isActive = editingId === r.id;
               return (
                 <tr
                   key={r.id}
                   className={`border-b border-border/50 last:border-0 ${
-                    isActive ? "bg-blue-dim/30" : "hover:bg-surface/50"
+                    isActive
+                      ? "bg-blue-dim/30"
+                      : quitado
+                        ? "opacity-60 hover:opacity-100 hover:bg-surface/50"
+                        : "hover:bg-surface/50"
                   }`}
                 >
                   <td className="px-4 py-3 font-semibold text-foreground">
                     {fmtDateBR(r.data)}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-red">
-                    {brl(Number(r.valor_devolvido))}
+                    {brl(devolvido)}
                   </td>
                   <td className="px-4 py-3 text-right text-blue">
-                    {brl(Number(r.valor_rec_fornecedor))}
+                    {recF > 0 ? brl(recF) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-blue">
-                    {brl(Number(r.valor_rec_empresa))}
+                    {recE > 0 ? brl(recE) : <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-gold">
-                    {brl(pend)}
+                  <td className="px-4 py-3 text-right font-bold">
+                    {quitado ? (
+                      <span className="text-green">✓ Quitado</span>
+                    ) : semRecuperacao ? (
+                      <span className="text-red">{brl(pend)}</span>
+                    ) : (
+                      <span className="text-gold">{brl(pend)}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
