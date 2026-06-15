@@ -18,26 +18,26 @@ export function AppHeader() {
     try {
       const { data: s } = await supabase.auth.getSession();
       const uid = s.session?.user.id;
-      let usuario: string | undefined;
+      let usuario: string | null = null;
       if (uid) {
         const { data: prof } = await supabase
           .from("profiles")
           .select("display_name, email")
           .eq("id", uid)
           .maybeSingle();
-        usuario = prof?.display_name || prof?.email || s.session?.user.email || undefined;
+        usuario = prof?.display_name || prof?.email || s.session?.user.email || null;
       }
       const carteiraNFs = notas.filter((n) => !isEnviado(n));
-      const { error } = await supabase.functions.invoke("telegram-notify", {
-        body: {
-          type: "resumo_geral",
-          carteira_valor: carteiraNFs.reduce((s, n) => s + n.valor, 0),
-          carteira_notas: carteiraNFs.length,
-          saldo_caixa: saldoAtual,
-          usuario,
-        },
+      // Chama RPC que lê o token do vault e envia direto para a API do Telegram
+      // sem depender do deploy da edge function
+      const { data, error } = await supabase.rpc("send_status_telegram", {
+        p_carteira_valor: carteiraNFs.reduce((acc, n) => acc + n.valor, 0),
+        p_carteira_notas: carteiraNFs.length,
+        p_saldo_caixa: saldoAtual,
+        p_usuario: usuario,
       });
       if (error) throw error;
+      if (data?.ok === false) throw new Error(data?.error ?? "Falha ao enviar");
       toast.success("Status enviado ao Telegram ✅");
     } catch (e) {
       toast.error("Erro ao enviar status");

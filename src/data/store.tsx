@@ -16,6 +16,8 @@ type NfRow = {
   status_nf: string;
   entrega: string;
   cheque_enviado_em?: string | null;
+  cheque_separado_em?: string | null;
+  separado_por?: string | null;
   created_at?: string;
 };
 
@@ -42,6 +44,8 @@ const mapNf = (r: NfRow): NFRecord => ({
   statusNf: r.status_nf,
   entrega: r.entrega,
   chequeEnviadoEm: r.cheque_enviado_em ?? undefined,
+  chequeSeparadoEm: r.cheque_separado_em ?? undefined,
+  separadoPor: r.separado_por ?? undefined,
   createdAt: r.created_at,
 });
 
@@ -104,7 +108,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notas_fiscais")
-        .select("id, fornecedor, nf, filial, valor, status_nf, entrega, cheque_enviado_em, created_at")
+        .select("id, fornecedor, nf, filial, valor, status_nf, entrega, cheque_enviado_em, cheque_separado_em, separado_por, created_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as NfRow[]).map(mapNf);
@@ -337,6 +341,51 @@ export function useStore() {
     onSettled: () => invalidateCaixa(),
   });
 
+  // ============ SEPARAR / CANCELAR SEPARAÇÃO ============
+
+  const separarNfM = useMutation({
+    mutationFn: async (nfId: string) => {
+      const { data, error } = await supabase.rpc("separar_nf", { p_nf_id: nfId });
+      if (error) throw error;
+      return data as { id: string; fornecedor: string; nf: string; valor: number };
+    },
+    onMutate: async (nfId) => {
+      const prev = await snapshot<NFRecord[]>(qc, QK.notas);
+      const now = new Date().toISOString();
+      qc.setQueryData<NFRecord[]>(QK.notas, (old) =>
+        (old ?? []).map((n) => n.id === nfId ? { ...n, chequeSeparadoEm: now } : n),
+      );
+      return { prev };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(QK.notas, ctx.prev);
+      toast.error(`Erro ao separar: ${e.message}`);
+    },
+    onSuccess: (data) => toast.success(`${data.fornecedor} separado para envio`),
+    onSettled: () => invalidateNotas(),
+  });
+
+  const cancelarSeparacaoM = useMutation({
+    mutationFn: async (nfId: string) => {
+      const { data, error } = await supabase.rpc("cancelar_separacao_nf", { p_nf_id: nfId });
+      if (error) throw error;
+      return data as { id: string; fornecedor: string };
+    },
+    onMutate: async (nfId) => {
+      const prev = await snapshot<NFRecord[]>(qc, QK.notas);
+      qc.setQueryData<NFRecord[]>(QK.notas, (old) =>
+        (old ?? []).map((n) => n.id === nfId ? { ...n, chequeSeparadoEm: undefined, separadoPor: undefined } : n),
+      );
+      return { prev };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(QK.notas, ctx.prev);
+      toast.error(`Erro ao cancelar separação: ${e.message}`);
+    },
+    onSuccess: (data) => toast.success(`Separação de ${data.fornecedor} cancelada`),
+    onSettled: () => invalidateNotas(),
+  });
+
   // ============ CONFIRMAR ENVIO ============
 
   const confirmarEnvioM = useMutation({
@@ -432,6 +481,10 @@ export function useStore() {
     addNota: (n: Omit<NFRecord, "id">) => addNotaM.mutate(n),
     updateNota: (id: string, n: Omit<NFRecord, "id">) => updateNotaM.mutate({ id, n }),
     removeNota: (id: string) => removeNotaM.mutate(id),
+    separarNf: (id: string) => separarNfM.mutate(id),
+    cancelarSeparacao: (id: string) => cancelarSeparacaoM.mutate(id),
+    separandoId: separarNfM.isPending ? separarNfM.variables ?? null : null,
+    cancelandoSeparacaoId: cancelarSeparacaoM.isPending ? cancelarSeparacaoM.variables ?? null : null,
     addCaixa: (c: Omit<CaixaRecord, "id">) => addCaixaM.mutate(c),
     updateCaixa: (id: string, c: Omit<CaixaRecord, "id">) => updateCaixaM.mutate({ id, c }),
     removeCaixa: (id: string) => removeCaixaM.mutate(id),
