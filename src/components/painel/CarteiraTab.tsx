@@ -127,7 +127,7 @@ export function CarteiraTab({
           value={brl(totals.aguardando.val)}
           hint={`${totals.aguardando.qtd} notas`}
           explain="Mercadoria ainda não chegou."
-          tone="default"
+          tone="gold"
           icon={<Clock className="h-4 w-4" />}
         />
         <KpiCard
