@@ -26,7 +26,7 @@ export function KpiCard({
   tone?: Tone;
   icon?: ReactNode;
 }) {
-  const t = toneMap[tone];
+  const t = toneMap[tone] ?? toneMap.gold;
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-border/70">
       <div className="flex items-start justify-between gap-2">
