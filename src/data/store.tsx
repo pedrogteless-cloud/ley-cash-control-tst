@@ -38,6 +38,11 @@ type CaixaRow = {
 const toNum = (v: number | string) => (typeof v === "number" ? v : Number(v));
 const toStringArray = (v: string[] | null | undefined) =>
   Array.isArray(v) ? v.map(String) : undefined;
+const roundMoney = (v: number) => Math.round(v * 100) / 100;
+
+const isMissingEnviarChequeRpc = (error: { code?: string; message?: string }) =>
+  error.code === "PGRST202" ||
+  /Could not find the function public\.enviar_cheque_nfs/i.test(error.message ?? "");
 
 const mapNf = (r: NfRow): NFRecord => ({
   id: r.id,
@@ -83,6 +88,106 @@ function computeChain(rows: CaixaRecord[]): CaixaRecord[] {
     running = saldoTotal;
   }
   return result;
+}
+
+function sortCaixaRowsForBalance(rows: CaixaRow[]) {
+  return [...rows].sort((a, b) => {
+    const [aDay = 0, aMonth = 0] = a.data.split("/").map(Number);
+    const [bDay = 0, bMonth = 0] = b.data.split("/").map(Number);
+    return (
+      aMonth - bMonth ||
+      aDay - bDay ||
+      String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""))
+    );
+  });
+}
+
+function formatHojeCaixa() {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(new Date());
+}
+
+async function enviarChequeFallbackDireto({
+  nfIds,
+  fornecedor,
+  valorEnviado,
+}: {
+  nfIds: string[];
+  fornecedor: string;
+  valorEnviado: number;
+}) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id ?? null;
+  if (!userId) throw new Error("unauthenticated");
+
+  const { data: nfsData, error: nfsError } = await supabase
+    .from("notas_fiscais")
+    .select("id, fornecedor, nf, valor, entrega, cheque_enviado_em, status_envio")
+    .in("id", nfIds);
+  if (nfsError) throw nfsError;
+
+  const selectedNfs = (nfsData as Pick<NfRow, "id" | "fornecedor" | "nf" | "valor" | "entrega" | "cheque_enviado_em" | "status_envio">[]) ?? [];
+  if (selectedNfs.length !== nfIds.length) throw new Error("nf_nao_encontrada");
+  if (selectedNfs.some((n) => n.status_envio === "ENVIADO" || !!n.cheque_enviado_em)) {
+    throw new Error("nf_ja_enviada");
+  }
+  if (selectedNfs.some((n) => !n.entrega.toUpperCase().includes("CHEGOU") || n.entrega.toUpperCase().includes("NÃO") || n.entrega.toUpperCase().includes("NAO"))) {
+    throw new Error("nf_ainda_sem_carga");
+  }
+
+  const { data: caixaData, error: caixaError } = await supabase
+    .from("caixa_movimentos")
+    .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino, origem, nfs_resolvidas, created_at");
+  if (caixaError) throw caixaError;
+
+  const caixaRows = sortCaixaRowsForBalance((caixaData as CaixaRow[]) ?? []);
+  const saldoSeed = caixaRows.length ? toNum(caixaRows[0].saldo_anterior) : 0;
+  const saldoAnterior = roundMoney(
+    saldoSeed +
+      caixaRows.reduce((sum, row) => sum + toNum(row.entrada), 0) -
+      caixaRows.reduce((sum, row) => sum + toNum(row.saida), 0),
+  );
+  const saldoTotal = roundMoney(saldoAnterior - valorEnviado);
+  const valorTitulos = roundMoney(selectedNfs.reduce((sum, nf) => sum + toNum(nf.valor), 0));
+
+  const { data: movimento, error: insertError } = await supabase
+    .from("caixa_movimentos")
+    .insert({
+      data: formatHojeCaixa(),
+      saldo_anterior: saldoAnterior,
+      entrada: 0,
+      saida: valorEnviado,
+      saldo_total: saldoTotal,
+      destino: fornecedor,
+      origem: "auto_nf",
+      nfs_resolvidas: nfIds,
+      criado_por: userId,
+    })
+    .select("id")
+    .single();
+  if (insertError) throw insertError;
+
+  const { error: updateError } = await supabase
+    .from("notas_fiscais")
+    .update({ status_envio: "ENVIADO", cheque_enviado_em: new Date().toISOString() })
+    .in("id", nfIds);
+  if (updateError) {
+    await supabase.from("caixa_movimentos").delete().eq("id", movimento.id);
+    throw updateError;
+  }
+
+  return {
+    movimento_id: movimento.id,
+    fornecedor,
+    qtd_nfs: nfIds.length,
+    valor_titulos: valorTitulos,
+    valor_enviado: valorEnviado,
+    saldo_anterior: saldoAnterior,
+    saldo_total: saldoTotal,
+  };
 }
 
 const QK = {
@@ -348,7 +453,12 @@ export function useStore() {
         p_fornecedor: fornecedor,
         p_valor_enviado: valorEnviado,
       });
-      if (error) throw error;
+      if (error) {
+        if (isMissingEnviarChequeRpc(error)) {
+          return enviarChequeFallbackDireto({ nfIds, fornecedor, valorEnviado });
+        }
+        throw error;
+      }
 
       return data as {
         saldo_total?: number;
