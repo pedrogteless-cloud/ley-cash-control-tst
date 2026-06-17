@@ -53,7 +53,8 @@ function EnvioFornecedorCard({
   const toggle = (id: string) => {
     setSelecionadas((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -130,7 +131,7 @@ function EnvioFornecedorCard({
             className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-green px-3 py-2.5 text-sm font-bold text-background hover:bg-green/90 active:scale-95 disabled:opacity-60 transition-all"
           >
             <CheckCircle2 className="h-4 w-4" />
-            {isEnviando ? "Confirmando envio..." : "Confirmar envio do cheque"}
+            {isEnviando ? "Registrando saída..." : "Registrar saída de cheque"}
           </button>
         </div>
       )}
@@ -224,7 +225,7 @@ export function CarteiraTab({
       {/* KPIs */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Em Carteira"   value={brl(totals.emCarteira.val)} hint={`${totals.emCarteira.qtd} prontas`}  explain="NFs chegadas, cheque ainda não separado." tone="orange" icon={<Send className="h-4 w-4" />} />
-        <KpiCard label="Separado p/ Envio" value={brl(totals.separados.val)} hint={`${totals.separados.qtd} separadas`} explain="Reservadas para envio, aguardando confirmação." tone="blue" icon={<PackageCheck className="h-4 w-4" />} />
+        <KpiCard label="Separado p/ Envio" value={brl(totals.separados.val)} hint={`${totals.separados.qtd} separadas`} explain="Reservadas para baixa em uma saída de cheque." tone="blue" icon={<PackageCheck className="h-4 w-4" />} />
         <KpiCard label="Aguardando Carga"  value={brl(totals.aguardando.val)} hint={`${totals.aguardando.qtd} notas`} explain="Mercadoria ainda não chegou." tone="gold" icon={<Clock className="h-4 w-4" />} />
         <KpiCard label="Total Carteira"    value={brl(totals.total)}          hint={`${notas.length - totals.enviados.qtd} em aberto`} explain="Soma do que ainda está em aberto." tone="green" icon={<Wallet className="h-4 w-4" />} />
       </div>
@@ -234,7 +235,7 @@ export function CarteiraTab({
         <div className="space-y-3">
           <div className="text-sm font-semibold text-foreground flex items-center gap-2">
             <PackageCheck className="h-4 w-4 text-blue" />
-            Separados para envio — confirme o cheque por fornecedor
+            Separados para envio — registre a saída por fornecedor
           </div>
           {gruposEnviar.map(([fornecedor, nfs]) => (
             <EnvioFornecedorCard

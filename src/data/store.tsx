@@ -36,6 +36,8 @@ type CaixaRow = {
 };
 
 const toNum = (v: number | string) => (typeof v === "number" ? v : Number(v));
+const toStringArray = (v: string[] | null | undefined) =>
+  Array.isArray(v) ? v.map(String) : undefined;
 
 const mapNf = (r: NfRow): NFRecord => ({
   id: r.id,
@@ -61,7 +63,7 @@ const mapCaixa = (r: CaixaRow): CaixaRecord => ({
   saldoTotal: toNum(r.saldo_total),
   destino: r.destino ?? undefined,
   origem: r.origem ?? undefined,
-  nfsResolvidas: r.nfs_resolvidas ?? undefined,
+  nfsResolvidas: toStringArray(r.nfs_resolvidas),
   createdAt: r.created_at,
 });
 
@@ -83,24 +85,6 @@ function computeChain(rows: CaixaRecord[]): CaixaRecord[] {
   return result;
 }
 
-/** Retorna o movimento de caixa mais recente por created_at. */
-function ultimoMovimento(caixa: CaixaRecord[]): CaixaRecord | null {
-  return caixa.reduce<CaixaRecord | null>((latest, c) => {
-    if (!latest) return c;
-    const ta = c.createdAt ? new Date(c.createdAt).getTime() : 0;
-    const tb = latest.createdAt ? new Date(latest.createdAt).getTime() : 0;
-    return ta >= tb ? c : latest;
-  }, null);
-}
-
-async function notifyTelegram(payload: Record<string, unknown>) {
-  try {
-    await supabase.functions.invoke("telegram-notify", { body: payload });
-  } catch {
-    // notificação é best-effort — não bloqueia o fluxo principal
-  }
-}
-
 const QK = {
   notas: ["notas_fiscais"] as const,
   caixa: ["caixa_movimentos"] as const,
@@ -110,16 +94,6 @@ async function snapshot<T>(qc: QueryClient, key: readonly unknown[]) {
   await qc.cancelQueries({ queryKey: key });
   return qc.getQueryData<T>(key);
 }
-
-const todayDDMM = () => {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-};
-
-const todayDDMMYYYY = () => {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-};
 
 export function useStore() {
   const qc = useQueryClient();
@@ -366,65 +340,47 @@ export function useStore() {
 
   const enviarChequeM = useMutation({
     mutationFn: async ({ nfIds, fornecedor, valorEnviado }: { nfIds: string[]; fornecedor: string; valorEnviado: number }) => {
-      const { data: s } = await supabase.auth.getSession();
+      if (!nfIds.length) throw new Error("Selecione ao menos uma NF");
+      if (valorEnviado <= 0) throw new Error("Informe o valor enviado");
 
-      // 1. Marca as NFs como enviadas
-      const { error: nfError } = await supabase
-        .from("notas_fiscais")
-        .update({ status_envio: "ENVIADO" })
-        .in("id", nfIds);
-      if (nfError) throw nfError;
-
-      // 2. Calcula saldo atual e insere movimento de caixa
-      const ultimo = ultimoMovimento(caixaQ.data ?? []);
-      const saldoAnterior = ultimo ? ultimo.saldoTotal : 0;
-      const saldoTotal = Math.round((saldoAnterior - valorEnviado) * 100) / 100;
-      const dataStr = todayDDMM();
-
-      const { error: caixaError } = await supabase.from("caixa_movimentos").insert({
-        data: dataStr,
-        saldo_anterior: saldoAnterior,
-        entrada: 0,
-        saida: valorEnviado,
-        saldo_total: saldoTotal,
-        destino: fornecedor,
-        nfs_resolvidas: nfIds,
-        criado_por: s.session?.user.id ?? null,
+      const { data, error } = await supabase.rpc("enviar_cheque_nfs", {
+        p_nf_ids: nfIds,
+        p_fornecedor: fornecedor,
+        p_valor_enviado: valorEnviado,
       });
-      if (caixaError) throw caixaError;
+      if (error) throw error;
 
-      return { saldoTotal, saldoAnterior };
+      return data as {
+        saldo_total?: number;
+        saldoTotal?: number;
+        saldo_anterior?: number;
+        saldoAnterior?: number;
+        valor_enviado?: number;
+        valor_titulos?: number;
+      };
     },
     onSuccess: async (result, vars) => {
       invalidateNotas();
       invalidateCaixa();
-      toast.success(`Cheque enviado para ${vars.fornecedor}`);
+      const novoSaldo = Number(result.saldo_total ?? result.saldoTotal ?? 0);
+      toast.success(`Saída de cheque registrada para ${vars.fornecedor}`);
 
       // Telegram — busca nome do usuário
       try {
-        const { data: s } = await supabase.auth.getSession();
-        const uid = s.session?.user.id;
-        let usuario: string | undefined;
-        if (uid) {
-          const { data: prof } = await supabase.from("profiles").select("display_name, email").eq("id", uid).maybeSingle();
-          usuario = prof?.display_name || prof?.email || s.session?.user.email || undefined;
-        }
         await supabase.functions.invoke("telegram-notify", {
           body: {
-            type: "cheque_enviado",
-            notas: vars.nfIds.map((id) => {
-              const nf = notasQ.data?.find((n) => n.id === id);
-              return { fornecedor: vars.fornecedor, nf: nf?.nf ?? id, valor: nf?.valor ?? 0 };
-            }),
-            data: todayDDMMYYYY(),
-            usuario,
+            type: "envio_cheque",
+            fornecedor: vars.fornecedor,
+            qtdNfs: vars.nfIds.length,
+            valor: vars.valorEnviado,
+            novoSaldo,
           },
         });
       } catch (err) {
         console.error("telegram-notify invoke failed", err);
       }
     },
-    onError: (e: Error) => toast.error(`Erro ao confirmar envio: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro ao registrar saída: ${e.message}`),
   });
 
   return {

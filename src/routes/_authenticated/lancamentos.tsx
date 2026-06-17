@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, ArrowLeft, LogOut, Pencil, Trash2, Inbox, CheckCircle2, Send, Search, Loader2 } from "lucide-react";
+import { Plus, ArrowLeft, LogOut, Pencil, Trash2, Inbox, CheckCircle2, Send, Search, PackageCheck } from "lucide-react";
 import { QuickAddDrawer } from "@/components/painel/QuickAddDrawer";
+import { EnvioChequeFornecedorCard } from "@/components/painel/EnvioChequeCard";
 import { useStore, type NFRecord, type CaixaRecord } from "@/data/store";
 import { useRoles } from "@/hooks/use-role";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
-import { isAEnviar, isAguardando, isEnviado } from "@/data/painel";
+import { isAguardando, isEnviado, isPendenteEnvio, isSeparado } from "@/data/painel";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -56,18 +57,16 @@ function Lancamentos() {
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const {
     notas, caixa, removeNota, removeCaixa,
-    confirmarEnvio, confirmandoEnvioId,
+    enviarCheque, isEnviandoCheque,
   } = useStore();
   const { canWrite, canWriteNf, canWriteCaixa, isAdmin, loading } = useRoles();
   const navigate = useNavigate();
 
-  // Quem pode confirmar envio: admin, lancador_nf, lancador_caixa
-  const canConfirmarEnvio = isAdmin || canWriteNf || canWriteCaixa;
+  const canRegistrarSaidaCheque = isAdmin || canWriteNf || canWriteCaixa;
 
   // Filtros / busca / modais
   const [nfFilter, setNfFilter] = useState<NfFilter>("Todas");
   const [nfSearch, setNfSearch] = useState("");
-  const [confirmTarget, setConfirmTarget] = useState<{ id: string; fornecedor: string; valor: number } | null>(null);
   const [deleteNfTarget, setDeleteNfTarget] = useState<NFRecord | null>(null);
   const [deleteCaixaTarget, setDeleteCaixaTarget] = useState<CaixaRecord | null>(null);
 
@@ -87,12 +86,22 @@ function Lancamentos() {
   const todasNfs = useMemo(() => {
     const q = nfSearch.trim().toLowerCase();
     let arr = [...notas].sort(byCreatedDesc);
-    if (nfFilter === "Enviar Cheque") arr = arr.filter(isAEnviar);
+    if (nfFilter === "Enviar Cheque") arr = arr.filter(isPendenteEnvio);
     else if (nfFilter === "Aguardando Carga") arr = arr.filter(isAguardando);
     else if (nfFilter === "Enviados") arr = arr.filter(isEnviado);
     if (q) arr = arr.filter((n) => n.fornecedor.toLowerCase().includes(q) || n.nf.toLowerCase().includes(q));
     return arr;
   }, [notas, nfFilter, nfSearch]);
+
+  const gruposEnvio = useMemo(() => {
+    const map = new Map<string, { id: string; nf: string; valor: number; filial: string; separado: boolean }[]>();
+    notas.filter(isPendenteEnvio).forEach((n) => {
+      const arr = map.get(n.fornecedor) ?? [];
+      arr.push({ id: n.id, nf: n.nf, valor: n.valor, filial: n.filial, separado: isSeparado(n) });
+      map.set(n.fornecedor, arr);
+    });
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [notas]);
 
   const caixaHistorico = useMemo(() => [...caixa].sort(byCreatedDesc), [caixa]);
 
@@ -179,6 +188,23 @@ function Lancamentos() {
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-8">
         {activeTab === "carteira" ? (
           <>
+            {canRegistrarSaidaCheque && gruposEnvio.length > 0 && (
+              <Section title="Saída de cheques" subtitle="NFs em aberto por fornecedor.">
+                <div className="space-y-2">
+                  {gruposEnvio.map(([fornecedor, nfs]) => (
+                    <EnvioChequeFornecedorCard
+                      key={fornecedor}
+                      fornecedor={fornecedor}
+                      nfs={nfs}
+                      defaultOpen={gruposEnvio.length === 1}
+                      onEnviar={(nfIds, valorEnviado) => enviarCheque({ nfIds, fornecedor, valorEnviado })}
+                      isEnviando={isEnviandoCheque}
+                    />
+                  ))}
+                </div>
+              </Section>
+            )}
+
             <Section title="Lançados hoje" subtitle="Atalho rápido para revisar o que você acabou de cadastrar.">
               <TodayList
                 items={nfsHoje}
@@ -187,10 +213,7 @@ function Lancamentos() {
                   <NfRow
                     key={n.id}
                     n={n}
-                    canConfirmar={canConfirmarEnvio}
-                    confirmando={confirmandoEnvioId === n.id}
                     onEdit={() => onEdit("nf", n.id)}
-                    onConfirmarEnvio={() => setConfirmTarget({ id: n.id, fornecedor: n.fornecedor, valor: n.valor })}
                     onDelete={() => setDeleteNfTarget(n)}
                   />
                 )}
@@ -199,7 +222,7 @@ function Lancamentos() {
 
             <Section
               title="Todas as NFs"
-              subtitle="Lista completa para editar, confirmar envio de cheque (com baixa no caixa) ou excluir."
+              subtitle="Lista completa para editar ou excluir."
             >
               <div className="space-y-3">
                 <div className="relative">
@@ -235,10 +258,7 @@ function Lancamentos() {
                       <NfRow
                         key={n.id}
                         n={n}
-                        canConfirmar={canConfirmarEnvio}
-                        confirmando={confirmandoEnvioId === n.id}
                         onEdit={() => onEdit("nf", n.id)}
-                        onConfirmarEnvio={() => setConfirmTarget({ id: n.id, fornecedor: n.fornecedor, valor: n.valor })}
                         onDelete={() => setDeleteNfTarget(n)}
                       />
                     ))}
@@ -302,36 +322,6 @@ function Lancamentos() {
         initialTab={activeTab === "carteira" ? "nf" : "caixa"}
       />
 
-      {/* Confirmar envio de cheque */}
-      <AlertDialog open={!!confirmTarget} onOpenChange={(o) => !o && setConfirmTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar envio do cheque?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmTarget && (
-                <>
-                  Confirmar envio do cheque para <strong>{confirmTarget.fornecedor}</strong> — <strong>{brl(confirmTarget.valor)}</strong>?
-                  <br />
-                  Esta ação dá baixa automática no caixa de hoje.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="active:scale-95 transition-transform">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (confirmTarget) confirmarEnvio(confirmTarget.id);
-                setConfirmTarget(null);
-              }}
-              className="bg-orange text-background hover:bg-orange/90 active:scale-95 transition-transform"
-            >
-              Confirmar envio
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Excluir NF — com alerta sobre cheque enviado */}
       <AlertDialog open={!!deleteNfTarget} onOpenChange={(o) => !o && setDeleteNfTarget(null)}>
         <AlertDialogContent>
@@ -343,8 +333,7 @@ function Lancamentos() {
                   <strong>{deleteNfTarget.fornecedor}</strong> — NF {deleteNfTarget.nf} — <strong>{brl(deleteNfTarget.valor)}</strong>
                   <br /><br />
                   <span className="text-orange">
-                    Atenção: se o cheque já foi enviado ao fornecedor, o correto é usar <strong>Confirmar envio</strong>,
-                    não excluir. Confirmar envio registra a baixa no caixa; excluir apaga o registro permanentemente.
+                    Excluir apaga o registro permanentemente. Para baixa de cheque, use a saída agrupada por fornecedor.
                   </span>
                 </>
               )}
@@ -466,22 +455,17 @@ function timeLabel(iso?: string) {
 
 function NfRow({
   n,
-  canConfirmar,
-  confirmando,
   onEdit,
-  onConfirmarEnvio,
   onDelete,
 }: {
   n: NFRecord;
-  canConfirmar: boolean;
-  confirmando: boolean;
   onEdit: () => void;
-  onConfirmarEnvio: () => void;
   onDelete: () => void;
 }) {
-  const aEnviar = isAEnviar(n);
+  const pendenteEnvio = isPendenteEnvio(n);
   const enviado = isEnviado(n);
   const aguardando = isAguardando(n);
+  const separado = isSeparado(n);
 
   return (
     <div className="rounded-xl border border-border bg-card p-3">
@@ -499,7 +483,11 @@ function NfRow({
               <span className="inline-flex items-center gap-1 rounded-md bg-green-dim px-2 py-0.5 text-[11px] font-bold text-green">
                 <CheckCircle2 className="h-3 w-3" /> Enviado em {fmtDate(n.chequeEnviadoEm)}
               </span>
-            ) : aEnviar ? (
+            ) : separado ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-blue-dim px-2 py-0.5 text-[11px] font-bold text-blue">
+                <PackageCheck className="h-3 w-3" /> Separado
+              </span>
+            ) : pendenteEnvio ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-orange-dim px-2 py-0.5 text-[11px] font-bold text-orange">
                 <Send className="h-3 w-3" /> ENVIAR CHEQUE
               </span>
@@ -520,19 +508,6 @@ function NfRow({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-end gap-1 border-t border-border/60 pt-2">
-        {canConfirmar && !enviado && (
-          <button
-            onClick={onConfirmarEnvio}
-            disabled={confirmando}
-            className="mr-auto inline-flex min-h-11 items-center gap-1.5 rounded-md bg-orange px-3 py-2 text-xs font-bold text-background transition-transform transition-colors duration-150 hover:bg-orange/90 active:scale-95 disabled:opacity-60"
-          >
-            {confirmando ? (
-              <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Enviando...</>
-            ) : (
-              <><CheckCircle2 className="h-3.5 w-3.5" /> Confirmar envio</>
-            )}
-          </button>
-        )}
         <button
           onClick={onEdit}
           className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-blue transition-transform transition-colors duration-150 hover:bg-blue-dim active:scale-95"
