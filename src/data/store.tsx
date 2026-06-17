@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NF, CaixaDia } from "@/data/painel";
 
-export type NFRecord = NF & { id: string; createdAt?: string };
-export type CaixaRecord = CaixaDia & { id: string; createdAt?: string };
+export type NFRecord = NF & { id: string; createdAt?: string; statusEnvio?: string | null };
+export type CaixaRecord = CaixaDia & { id: string; createdAt?: string; nfsResolvidas?: string[] };
 
 type NfRow = {
   id: string;
@@ -16,6 +16,7 @@ type NfRow = {
   status_nf: string;
   entrega: string;
   cheque_enviado_em?: string | null;
+  status_envio?: string | null;
   cheque_separado_em?: string | null;
   separado_por?: string | null;
   created_at?: string;
@@ -30,6 +31,7 @@ type CaixaRow = {
   saldo_total: number | string;
   destino: string | null;
   origem?: string | null;
+  nfs_resolvidas?: string[] | null;
   created_at?: string;
 };
 
@@ -44,6 +46,7 @@ const mapNf = (r: NfRow): NFRecord => ({
   statusNf: r.status_nf,
   entrega: r.entrega,
   chequeEnviadoEm: r.cheque_enviado_em ?? undefined,
+  statusEnvio: r.status_envio ?? null,
   chequeSeparadoEm: r.cheque_separado_em ?? undefined,
   separadoPor: r.separado_por ?? undefined,
   createdAt: r.created_at,
@@ -58,19 +61,19 @@ const mapCaixa = (r: CaixaRow): CaixaRecord => ({
   saldoTotal: toNum(r.saldo_total),
   destino: r.destino ?? undefined,
   origem: r.origem ?? undefined,
+  nfsResolvidas: r.nfs_resolvidas ?? undefined,
   createdAt: r.created_at,
 });
 
 /**
  * Deriva saldo_anterior e saldo_total em cadeia a partir dos dados brutos.
  * Seed = saldo_anterior da primeira linha (único valor que o usuário controla).
- * Todas as linhas subsequentes são recalculadas, garantindo consistência mesmo
- * após edições, inserções retroativas ou exclusões.
+ * Garante consistência mesmo após edições, inserções retroativas ou exclusões.
  */
 function computeChain(rows: CaixaRecord[]): CaixaRecord[] {
   if (!rows.length) return [];
   const result: CaixaRecord[] = [];
-  let running = rows[0].saldoAnterior; // seed
+  let running = rows[0].saldoAnterior;
   for (const row of rows) {
     const saldoAnterior = running;
     const saldoTotal = Math.round((saldoAnterior + row.entrada - row.saida) * 100) / 100;
@@ -80,10 +83,33 @@ function computeChain(rows: CaixaRecord[]): CaixaRecord[] {
   return result;
 }
 
+/** Retorna o movimento de caixa mais recente por created_at. */
+function ultimoMovimento(caixa: CaixaRecord[]): CaixaRecord | null {
+  return caixa.reduce<CaixaRecord | null>((latest, c) => {
+    if (!latest) return c;
+    const ta = c.createdAt ? new Date(c.createdAt).getTime() : 0;
+    const tb = latest.createdAt ? new Date(latest.createdAt).getTime() : 0;
+    return ta >= tb ? c : latest;
+  }, null);
+}
+
+async function notifyTelegram(payload: Record<string, unknown>) {
+  try {
+    await supabase.functions.invoke("telegram-notify", { body: payload });
+  } catch {
+    // notificação é best-effort — não bloqueia o fluxo principal
+  }
+}
+
 const QK = {
   notas: ["notas_fiscais"] as const,
   caixa: ["caixa_movimentos"] as const,
 };
+
+async function snapshot<T>(qc: QueryClient, key: readonly unknown[]) {
+  await qc.cancelQueries({ queryKey: key });
+  return qc.getQueryData<T>(key);
+}
 
 const todayDDMM = () => {
   const d = new Date();
@@ -95,11 +121,6 @@ const todayDDMMYYYY = () => {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
 
-async function snapshot<T>(qc: QueryClient, key: readonly unknown[]) {
-  await qc.cancelQueries({ queryKey: key });
-  return qc.getQueryData<T>(key);
-}
-
 export function useStore() {
   const qc = useQueryClient();
 
@@ -108,7 +129,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notas_fiscais")
-        .select("id, fornecedor, nf, filial, valor, status_nf, entrega, cheque_enviado_em, cheque_separado_em, separado_por, created_at")
+        .select("id, fornecedor, nf, filial, valor, status_nf, entrega, cheque_enviado_em, status_envio, cheque_separado_em, separado_por, created_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as NfRow[]).map(mapNf);
@@ -120,7 +141,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("caixa_movimentos")
-        .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino, origem, created_at")
+        .select("id, data, saldo_anterior, entrada, saida, saldo_total, destino, origem, nfs_resolvidas, created_at")
         .order("data", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -130,7 +151,9 @@ export function useStore() {
 
   const invalidateNotas = () => qc.invalidateQueries({ queryKey: QK.notas });
   const invalidateCaixa = () => qc.invalidateQueries({ queryKey: QK.caixa });
-      useEffect(() => {
+
+  // Realtime subscriptions
+  useEffect(() => {
     const channel = supabase
       .channel(`store-realtime-${Math.random()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "notas_fiscais" }, () => invalidateNotas())
@@ -138,6 +161,7 @@ export function useStore() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
+
   // ============ NF MUTATIONS ============
 
   const addNotaM = useMutation({
@@ -156,11 +180,7 @@ export function useStore() {
     },
     onMutate: async (n) => {
       const prev = await snapshot<NFRecord[]>(qc, QK.notas);
-      const optimistic: NFRecord = {
-        ...n,
-        id: `optimistic-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-      };
+      const optimistic: NFRecord = { ...n, id: `optimistic-${Date.now()}`, createdAt: new Date().toISOString() };
       qc.setQueryData<NFRecord[]>(QK.notas, (old) => [optimistic, ...(old ?? [])]);
       return { prev };
     },
@@ -176,22 +196,13 @@ export function useStore() {
     mutationFn: async ({ id, n }: { id: string; n: Omit<NFRecord, "id"> }) => {
       const { error } = await supabase
         .from("notas_fiscais")
-        .update({
-          fornecedor: n.fornecedor,
-          nf: n.nf,
-          filial: n.filial,
-          valor: n.valor,
-          status_nf: n.statusNf,
-          entrega: n.entrega,
-        })
+        .update({ fornecedor: n.fornecedor, nf: n.nf, filial: n.filial, valor: n.valor, status_nf: n.statusNf, entrega: n.entrega })
         .eq("id", id);
       if (error) throw error;
     },
     onMutate: async ({ id, n }) => {
       const prev = await snapshot<NFRecord[]>(qc, QK.notas);
-      qc.setQueryData<NFRecord[]>(QK.notas, (old) =>
-        (old ?? []).map((x) => (x.id === id ? { ...x, ...n } : x)),
-      );
+      qc.setQueryData<NFRecord[]>(QK.notas, (old) => (old ?? []).map((x) => (x.id === id ? { ...x, ...n } : x)));
       return { prev };
     },
     onError: (e: Error, _v, ctx) => {
@@ -221,13 +232,7 @@ export function useStore() {
       const removed = ctx?.removed;
       toast.success("Nota fiscal removida", {
         action: removed
-          ? {
-              label: "Desfazer",
-              onClick: () => {
-                const { id: _omit, createdAt: _c, ...rest } = removed;
-                addNotaM.mutate(rest);
-              },
-            }
+          ? { label: "Desfazer", onClick: () => { const { id: _omit, createdAt: _c, statusEnvio: _se, chequeSeparadoEm: _cs, separadoPor: _sp, chequeEnviadoEm: _ce, ...rest } = removed; addNotaM.mutate(rest); } }
           : undefined,
         duration: 6000,
       });
@@ -240,30 +245,18 @@ export function useStore() {
   const addCaixaM = useMutation({
     mutationFn: async (c: Omit<CaixaRecord, "id">) => {
       const { data: s } = await supabase.auth.getSession();
-      // Persiste saldo_anterior e saldo_total para que confirmar_envio_nf
-      // (RPC Postgres) ainda encontre valores válidos no banco.
       const { error } = await supabase.from("caixa_movimentos").insert({
-        data: c.data,
-        saldo_anterior: c.saldoAnterior,
-        entrada: c.entrada,
-        saida: c.saida,
-        saldo_total: c.saldoTotal,
-        destino: c.destino ?? null,
+        data: c.data, saldo_anterior: c.saldoAnterior, entrada: c.entrada, saida: c.saida,
+        saldo_total: c.saldoTotal, destino: c.destino ?? null,
+        nfs_resolvidas: c.nfsResolvidas ?? null,
         criado_por: s.session?.user.id ?? null,
       });
       if (error) throw error;
     },
     onMutate: async (c) => {
       const prev = await snapshot<CaixaRecord[]>(qc, QK.caixa);
-      const optimistic: CaixaRecord = {
-        ...c,
-        id: `optimistic-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-      };
-      // Insere e recalcula cadeia para posicionar corretamente por data
-      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) =>
-        computeChain([...(old ?? []), optimistic]),
-      );
+      const optimistic: CaixaRecord = { ...c, id: `optimistic-${Date.now()}`, createdAt: new Date().toISOString() };
+      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) => computeChain([...(old ?? []), optimistic]));
       return { prev };
     },
     onError: (e: Error, _v, ctx) => {
@@ -276,22 +269,14 @@ export function useStore() {
 
   const updateCaixaM = useMutation({
     mutationFn: async ({ id, c }: { id: string; c: Omit<CaixaRecord, "id"> }) => {
-      // Só enviamos os campos que o usuário edita.
-      // saldo_anterior e saldo_total são derivados via computeChain no fetch.
       const { error } = await supabase
         .from("caixa_movimentos")
-        .update({
-          data: c.data,
-          entrada: c.entrada,
-          saida: c.saida,
-          destino: c.destino ?? null,
-        })
+        .update({ data: c.data, entrada: c.entrada, saida: c.saida, destino: c.destino ?? null })
         .eq("id", id);
       if (error) throw error;
     },
     onMutate: async ({ id, c }) => {
       const prev = await snapshot<CaixaRecord[]>(qc, QK.caixa);
-      // Optimistic: aplica edição e recalcula cadeia inteira
       qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) =>
         computeChain((old ?? []).map((x) => (x.id === id ? { ...x, ...c } : x))),
       );
@@ -313,10 +298,7 @@ export function useStore() {
     onMutate: async (id) => {
       const prev = await snapshot<CaixaRecord[]>(qc, QK.caixa);
       const removed = (prev ?? []).find((c) => c.id === id);
-      // Remove e recalcula cadeia para todos os movimentos restantes
-      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) =>
-        computeChain((old ?? []).filter((c) => c.id !== id)),
-      );
+      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) => computeChain((old ?? []).filter((c) => c.id !== id)));
       return { prev, removed };
     },
     onError: (e: Error, _v, ctx) => {
@@ -327,13 +309,7 @@ export function useStore() {
       const removed = ctx?.removed;
       toast.success("Movimento removido", {
         action: removed
-          ? {
-              label: "Desfazer",
-              onClick: () => {
-                const { id: _omit, createdAt: _c, ...rest } = removed;
-                addCaixaM.mutate(rest);
-              },
-            }
+          ? { label: "Desfazer", onClick: () => { const { id: _omit, createdAt: _c, nfsResolvidas: _nr, ...rest } = removed; addCaixaM.mutate(rest); } }
           : undefined,
         duration: 6000,
       });
@@ -386,80 +362,60 @@ export function useStore() {
     onSettled: () => invalidateNotas(),
   });
 
-  // ============ CONFIRMAR ENVIO ============
+  // ============ ENVIAR CHEQUE (baixa automática de caixa) ============
 
-  const confirmarEnvioM = useMutation({
-    mutationFn: async (nfId: string) => {
-      const { data, error } = await supabase.rpc("confirmar_envio_nf", { p_nf_id: nfId });
-      if (error) throw error;
-      return data as { id: string; fornecedor: string; nf: string; valor: number };
-    },
-    onMutate: async (nfId) => {
-      const prevNotas = await snapshot<NFRecord[]>(qc, QK.notas);
-      const prevCaixa = await snapshot<CaixaRecord[]>(qc, QK.caixa);
-      const nf = (prevNotas ?? []).find((n) => n.id === nfId);
-      if (!nf) return { prevNotas, prevCaixa };
+  const enviarChequeM = useMutation({
+    mutationFn: async ({ nfIds, fornecedor, valorEnviado }: { nfIds: string[]; fornecedor: string; valorEnviado: number }) => {
+      const { data: s } = await supabase.auth.getSession();
 
-      const nowIso = new Date().toISOString();
-      qc.setQueryData<NFRecord[]>(QK.notas, (old) =>
-        (old ?? []).map((n) => (n.id === nfId ? { ...n, chequeEnviadoEm: nowIso } : n)),
-      );
+      // 1. Marca as NFs como enviadas
+      const { error: nfError } = await supabase
+        .from("notas_fiscais")
+        .update({ status_envio: "ENVIADO" })
+        .in("id", nfIds);
+      if (nfError) throw nfError;
 
-      const hoje = todayDDMM();
-      qc.setQueryData<CaixaRecord[]>(QK.caixa, (old) => {
-        const arr = [...(old ?? [])];
-        const idx = arr.map((c, i) => ({ c, i })).filter((x) => x.c.data === hoje).pop();
-        if (idx) {
-          const c = idx.c;
-          const novaSaida = c.saida + nf.valor;
-          const novoDestino =
-            !c.destino || c.destino.trim() === ""
-              ? nf.fornecedor
-              : c.destino.includes(nf.fornecedor)
-                ? c.destino
-                : `${c.destino} + ${nf.fornecedor}`;
-          arr[idx.i] = { ...c, saida: novaSaida, destino: novoDestino };
-        } else {
-          arr.push({
-            id: `optimistic-${Date.now()}`,
-            data: hoje,
-            saldoAnterior: 0, // será corrigido pelo computeChain abaixo
-            entrada: 0,
-            saida: nf.valor,
-            saldoTotal: 0,    // idem
-            destino: nf.fornecedor,
-            origem: "auto_nf",
-            createdAt: nowIso,
-          });
-        }
-        return computeChain(arr);
+      // 2. Calcula saldo atual e insere movimento de caixa
+      const ultimo = ultimoMovimento(caixaQ.data ?? []);
+      const saldoAnterior = ultimo ? ultimo.saldoTotal : 0;
+      const saldoTotal = Math.round((saldoAnterior - valorEnviado) * 100) / 100;
+      const dataStr = todayDDMM();
+
+      const { error: caixaError } = await supabase.from("caixa_movimentos").insert({
+        data: dataStr,
+        saldo_anterior: saldoAnterior,
+        entrada: 0,
+        saida: valorEnviado,
+        saldo_total: saldoTotal,
+        destino: fornecedor,
+        nfs_resolvidas: nfIds,
+        criado_por: s.session?.user.id ?? null,
       });
+      if (caixaError) throw caixaError;
 
-      return { prevNotas, prevCaixa, nf };
+      return { saldoTotal, saldoAnterior };
     },
-    onError: (e: Error, _v, ctx) => {
-      if (ctx?.prevNotas) qc.setQueryData(QK.notas, ctx.prevNotas);
-      if (ctx?.prevCaixa) qc.setQueryData(QK.caixa, ctx.prevCaixa);
-      toast.error(`Erro ao confirmar envio: ${e.message}`);
-    },
-    onSuccess: async (data) => {
-      toast.success(`Cheque enviado: ${data.fornecedor}`);
+    onSuccess: async (result, vars) => {
+      invalidateNotas();
+      invalidateCaixa();
+      toast.success(`Cheque enviado para ${vars.fornecedor}`);
+
+      // Telegram — busca nome do usuário
       try {
         const { data: s } = await supabase.auth.getSession();
         const uid = s.session?.user.id;
         let usuario: string | undefined;
         if (uid) {
-          const { data: prof } = await supabase
-            .from("profiles")
-            .select("display_name, email")
-            .eq("id", uid)
-            .maybeSingle();
+          const { data: prof } = await supabase.from("profiles").select("display_name, email").eq("id", uid).maybeSingle();
           usuario = prof?.display_name || prof?.email || s.session?.user.email || undefined;
         }
         await supabase.functions.invoke("telegram-notify", {
           body: {
             type: "cheque_enviado",
-            notas: [{ fornecedor: data.fornecedor, nf: data.nf, valor: Number(data.valor) }],
+            notas: vars.nfIds.map((id) => {
+              const nf = notasQ.data?.find((n) => n.id === id);
+              return { fornecedor: vars.fornecedor, nf: nf?.nf ?? id, valor: nf?.valor ?? 0 };
+            }),
             data: todayDDMMYYYY(),
             usuario,
           },
@@ -468,10 +424,7 @@ export function useStore() {
         console.error("telegram-notify invoke failed", err);
       }
     },
-    onSettled: () => {
-      invalidateNotas();
-      invalidateCaixa();
-    },
+    onError: (e: Error) => toast.error(`Erro ao confirmar envio: ${e.message}`),
   });
 
   return {
@@ -481,16 +434,17 @@ export function useStore() {
     addNota: (n: Omit<NFRecord, "id">) => addNotaM.mutate(n),
     updateNota: (id: string, n: Omit<NFRecord, "id">) => updateNotaM.mutate({ id, n }),
     removeNota: (id: string) => removeNotaM.mutate(id),
-    separarNf: (id: string) => separarNfM.mutate(id),
-    cancelarSeparacao: (id: string) => cancelarSeparacaoM.mutate(id),
-    separandoId: separarNfM.isPending ? separarNfM.variables ?? null : null,
-    cancelandoSeparacaoId: cancelarSeparacaoM.isPending ? cancelarSeparacaoM.variables ?? null : null,
     addCaixa: (c: Omit<CaixaRecord, "id">) => addCaixaM.mutate(c),
     updateCaixa: (id: string, c: Omit<CaixaRecord, "id">) => updateCaixaM.mutate({ id, c }),
     removeCaixa: (id: string) => removeCaixaM.mutate(id),
-    confirmarEnvio: (id: string) => confirmarEnvioM.mutate(id),
-    confirmandoEnvioId: confirmarEnvioM.isPending ? confirmarEnvioM.variables ?? null : null,
+    separarNf: (id: string) => separarNfM.mutate(id),
+    cancelarSeparacao: (id: string) => cancelarSeparacaoM.mutate(id),
+    enviarCheque: (vars: { nfIds: string[]; fornecedor: string; valorEnviado: number }) =>
+      enviarChequeM.mutateAsync(vars),
     addingNota: addNotaM.isPending,
     addingCaixa: addCaixaM.isPending,
+    isSeparandoNf: separarNfM.isPending ? separarNfM.variables ?? null : null,
+    isCancelando: cancelarSeparacaoM.isPending ? cancelarSeparacaoM.variables ?? null : null,
+    isEnviandoCheque: enviarChequeM.isPending,
   };
 }

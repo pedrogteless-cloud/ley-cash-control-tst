@@ -135,6 +135,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ============ Envio de cheque com baixa automática (novo fluxo multi-NF) ============
+    if (payload?.type === "envio_cheque") {
+      const { fornecedor, qtdNfs, valor, novoSaldo } = payload ?? {};
+      const msg = [
+        "📤 <b>Cheque enviado — Grupo Ley</b>",
+        "",
+        `🏭 <b>Fornecedor:</b> ${escapeHtml(String(fornecedor ?? ""))}`,
+        `🧾 <b>NFs resolvidas:</b> ${escapeHtml(String(qtdNfs ?? 1))}`,
+        `💰 <b>Valor enviado:</b> ${escapeHtml(brl(Number(valor ?? 0)))}`,
+        `💵 <b>Novo saldo de caixa:</b> ${escapeHtml(brl(Number(novoSaldo ?? 0)))}`,
+      ].join("\n");
+      await sendTelegram(msg);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ============ Cheque enviado (chamado pelo cliente) ============
     if (payload?.type === "cheque_enviado" && Array.isArray(payload.notas)) {
       const notas = payload.notas as NfPayload[];

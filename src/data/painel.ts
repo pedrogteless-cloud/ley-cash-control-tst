@@ -5,7 +5,10 @@ export type NF = {
   valor: number;
   statusNf: string;
   entrega: string;
+  /** Legacy field — kept for backward-compat with data before 2026-06-17. */
   chequeEnviadoEm?: string;
+  /** New field — set to "ENVIADO" when cheque is confirmed sent. */
+  statusEnvio?: string | null;
   /** Timestamp set when the NF is reserved ("Separado para envio"). */
   chequeSeparadoEm?: string;
   /** User who performed the separation. */
@@ -17,7 +20,8 @@ export const isEnviar = (n: NF) =>
 
 export const isAguardando = (n: NF) => n.entrega.toUpperCase().includes("NÃO");
 
-export const isEnviado = (n: NF) => !!n.chequeEnviadoEm;
+/** NF já enviada — verifica novo campo status_envio e legacy chequeEnviadoEm */
+export const isEnviado = (n: NF) => n.statusEnvio === "ENVIADO" || !!n.chequeEnviadoEm;
 
 /** Cheque foi separado pelo operador mas ainda não confirmado/enviado. */
 export const isSeparado = (n: NF) => !!n.chequeSeparadoEm && !n.chequeEnviadoEm;
