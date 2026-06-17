@@ -472,7 +472,7 @@ export function useStore() {
     onSuccess: async (result, vars) => {
       invalidateNotas();
       invalidateCaixa();
-      const novoSaldo = Number(result.saldo_total ?? result.saldoTotal ?? 0);
+      const novoSaldo = Number(result.saldo_total ?? (result as { saldoTotal?: number }).saldoTotal ?? 0);
       toast.success(`Saída de cheque registrada para ${vars.fornecedor}`);
 
       // Telegram — busca nome do usuário
