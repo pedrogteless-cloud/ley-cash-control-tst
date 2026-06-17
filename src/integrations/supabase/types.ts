@@ -224,6 +224,14 @@ export type Database = {
     }
     Functions: {
       confirmar_envio_nf: { Args: { p_nf_id: string }; Returns: Json }
+      enviar_cheque_nfs: {
+        Args: {
+          p_fornecedor: string
+          p_nf_ids: string[]
+          p_valor_enviado: number
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
