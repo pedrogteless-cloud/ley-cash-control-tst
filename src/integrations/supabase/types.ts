@@ -55,6 +55,7 @@ export type Database = {
           destino: string | null
           entrada: number
           id: string
+          nfs_resolvidas: Json | null
           origem: string
           saida: number
           saldo_anterior: number
@@ -68,6 +69,7 @@ export type Database = {
           destino?: string | null
           entrada?: number
           id?: string
+          nfs_resolvidas?: Json | null
           origem?: string
           saida?: number
           saldo_anterior?: number
@@ -81,6 +83,7 @@ export type Database = {
           destino?: string | null
           entrada?: number
           id?: string
+          nfs_resolvidas?: Json | null
           origem?: string
           saida?: number
           saldo_anterior?: number
@@ -122,6 +125,7 @@ export type Database = {
       notas_fiscais: {
         Row: {
           cheque_enviado_em: string | null
+          cheque_separado_em: string | null
           created_at: string
           criado_por: string | null
           entrega: string
@@ -129,12 +133,15 @@ export type Database = {
           fornecedor: string
           id: string
           nf: string
+          separado_por: string | null
+          status_envio: string | null
           status_nf: string
           updated_at: string
           valor: number
         }
         Insert: {
           cheque_enviado_em?: string | null
+          cheque_separado_em?: string | null
           created_at?: string
           criado_por?: string | null
           entrega?: string
@@ -142,12 +149,15 @@ export type Database = {
           fornecedor: string
           id?: string
           nf: string
+          separado_por?: string | null
+          status_envio?: string | null
           status_nf?: string
           updated_at?: string
           valor?: number
         }
         Update: {
           cheque_enviado_em?: string | null
+          cheque_separado_em?: string | null
           created_at?: string
           criado_por?: string | null
           entrega?: string
@@ -155,6 +165,8 @@ export type Database = {
           fornecedor?: string
           id?: string
           nf?: string
+          separado_por?: string | null
+          status_envio?: string | null
           status_nf?: string
           updated_at?: string
           valor?: number
@@ -218,6 +230,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      send_status_telegram: {
+        Args: {
+          p_carteira_notas: number
+          p_carteira_valor: number
+          p_saldo_caixa: number
+          p_usuario?: string
+        }
+        Returns: Json
       }
       update_devolvido: {
         Args: {
