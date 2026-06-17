@@ -41,6 +41,13 @@ async function sendTelegram(text: string) {
   return { ok: res.ok, data };
 }
 
+async function sendTelegramOrThrow(text: string) {
+  const result = await sendTelegram(text);
+  if (!result.ok) {
+    throw new Error(String(result.error ?? "telegram_send_failed"));
+  }
+}
+
 type NfPayload = { fornecedor: string; nf: string; valor: number };
 
 Deno.serve(async (req) => {
@@ -78,7 +85,7 @@ Deno.serve(async (req) => {
       ];
       if (usuario) linhas.push("", `👤 <b>Solicitado por:</b> ${escapeHtml(String(usuario))}`);
 
-      await sendTelegram(linhas.join("\n"));
+      await sendTelegramOrThrow(linhas.join("\n"));
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -129,7 +136,7 @@ Deno.serve(async (req) => {
       linhas.push(`📊 <b>Total acumulado:</b> ${escapeHtml(brl(Number(total_recuperado_acumulado ?? 0)))}`);
       linhas.push(`⏳ <b>Pendente acumulado:</b> ${escapeHtml(brl(Number(pendenteAcumulado)))}`);
 
-      await sendTelegram(linhas.join("\n"));
+      await sendTelegramOrThrow(linhas.join("\n"));
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -146,7 +153,7 @@ Deno.serve(async (req) => {
         `💰 <b>Valor enviado:</b> ${escapeHtml(brl(Number(valor ?? 0)))}`,
         `💵 <b>Novo saldo de caixa:</b> ${escapeHtml(brl(Number(novoSaldo ?? 0)))}`,
       ].join("\n");
-      await sendTelegram(msg);
+      await sendTelegramOrThrow(msg);
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -182,7 +189,7 @@ Deno.serve(async (req) => {
       if (dataStr) linhas.push(`📅 <b>Data:</b> ${escapeHtml(dataStr)}`);
       if (usuario) linhas.push(`👤 <b>Ação executada por:</b> ${escapeHtml(usuario)}`);
 
-      await sendTelegram(linhas.join("\n"));
+      await sendTelegramOrThrow(linhas.join("\n"));
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -213,7 +220,7 @@ Deno.serve(async (req) => {
           "",
           "⚠️ <i>Separe os cheques e envie ao fornecedor.</i>",
         ].join("\n") + actorLine;
-        await sendTelegram(msg);
+        await sendTelegramOrThrow(msg);
       } else if (op === "INSERT") {
         const msg = [
           chegou
@@ -224,7 +231,7 @@ Deno.serve(async (req) => {
           `🏢 <b>Filial:</b> ${escapeHtml(record.filial)}`,
           `💰 <b>Valor:</b> ${escapeHtml(brl(record.valor))}`,
         ].join("\n") + actorLine;
-        await sendTelegram(msg);
+        await sendTelegramOrThrow(msg);
       }
     } else if (table === "caixa_movimentos") {
       // Não notificar lançamentos automáticos (já notificamos via cheque_enviado)
@@ -245,7 +252,7 @@ Deno.serve(async (req) => {
       ]
         .filter(Boolean)
         .join("\n") + actorLine;
-      await sendTelegram(msg);
+      await sendTelegramOrThrow(msg);
     } else if (table === "cheques_devolvidos") {
       const devolvido = Number(record.valor_devolvido) || 0;
       const recF = Number(record.valor_rec_fornecedor) || 0;
@@ -264,7 +271,7 @@ Deno.serve(async (req) => {
         `⏳ <b>Pendente:</b> ${escapeHtml(brl(pendente))}`,
       ].filter(Boolean).join("\n") + actorLine;
 
-      await sendTelegram(linhas);
+      await sendTelegramOrThrow(linhas);
     }
 
 

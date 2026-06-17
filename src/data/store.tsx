@@ -477,7 +477,7 @@ export function useStore() {
 
       // Telegram — busca nome do usuário
       try {
-        await supabase.functions.invoke("telegram-notify", {
+        const { data: telegramData, error: telegramError } = await supabase.functions.invoke("telegram-notify", {
           body: {
             type: "envio_cheque",
             fornecedor: vars.fornecedor,
@@ -486,7 +486,12 @@ export function useStore() {
             novoSaldo,
           },
         });
+        if (telegramError) throw telegramError;
+        if (telegramData?.ok === false) {
+          throw new Error(telegramData.error ?? "Falha ao enviar Telegram");
+        }
       } catch (err) {
+        toast.error("Saída registrada, mas o alerta do Telegram falhou");
         console.error("telegram-notify invoke failed", err);
       }
     },
