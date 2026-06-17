@@ -34,10 +34,11 @@ export function AppHeader() {
         p_carteira_valor: carteiraNFs.reduce((acc, n) => acc + n.valor, 0),
         p_carteira_notas: carteiraNFs.length,
         p_saldo_caixa: saldoAtual,
-        p_usuario: usuario,
+        p_usuario: usuario ?? undefined,
       });
       if (error) throw error;
-      if (data?.ok === false) throw new Error(data?.error ?? "Falha ao enviar");
+      const result = data as { ok?: boolean; error?: string } | null;
+      if (result?.ok === false) throw new Error(result?.error ?? "Falha ao enviar");
       toast.success("Status enviado ao Telegram ✅");
     } catch (e) {
       toast.error("Erro ao enviar status");
