@@ -223,6 +223,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancelar_separacao_nf: { Args: { p_nf_id: string }; Returns: Json }
       confirmar_envio_nf: { Args: { p_nf_id: string }; Returns: Json }
       enviar_cheque_nfs: {
         Args: {
@@ -248,6 +249,7 @@ export type Database = {
         }
         Returns: Json
       }
+      separar_nf: { Args: { p_nf_id: string }; Returns: Json }
       update_devolvido: {
         Args: {
           p_data: string
