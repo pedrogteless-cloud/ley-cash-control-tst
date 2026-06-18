@@ -63,24 +63,95 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ============ Resumo geral (disparado pelo botão no painel) ============
-    if (payload?.type === "resumo_geral") {
-      const { carteira_valor, carteira_notas, saldo_caixa, usuario } = payload ?? {};
-      const cobertura = Number(carteira_valor) > 0
-        ? ((Number(saldo_caixa) / Number(carteira_valor)) * 100).toFixed(0)
+    // ============ Resumo geral (manual via botão OU automático via cron) ============
+    if (payload?.type === "resumo_geral" || payload?.type === "resumo_automatico") {
+      let carteira_valor: number;
+      let carteira_notas: number;
+      let prioridade_valor: number;
+      let prioridade_notas: number;
+      let saldo_caixa: number;
+      let usuario: string | undefined = payload?.usuario;
+
+      if (payload?.type === "resumo_automatico") {
+        // Verificação de segredo para chamada automática
+        if (WEBHOOK_SECRET && req.headers.get("x-telegram-secret") !== WEBHOOK_SECRET) {
+          return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+        const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (!SUPABASE_URL || !SERVICE_KEY) {
+          return new Response(JSON.stringify({ ok: false, error: "missing_supabase_env" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.45.0");
+        const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+
+        const { data: nfs, error: nfsErr } = await sb
+          .from("notas_fiscais")
+          .select("valor, entrega, status_envio, cheque_enviado_em");
+        if (nfsErr) throw nfsErr;
+        const abertas = (nfs ?? []).filter(
+          (n: any) => n.status_envio !== "ENVIADO" && !n.cheque_enviado_em,
+        );
+        const prioridade = abertas.filter((n: any) => {
+          const e = String(n.entrega ?? "").toUpperCase();
+          return e.includes("CHEGOU") && !e.includes("NÃO") && !e.includes("NAO");
+        });
+        carteira_valor = abertas.reduce((s: number, n: any) => s + Number(n.valor || 0), 0);
+        carteira_notas = abertas.length;
+        prioridade_valor = prioridade.reduce((s: number, n: any) => s + Number(n.valor || 0), 0);
+        prioridade_notas = prioridade.length;
+
+        const { data: movs, error: movErr } = await sb
+          .from("caixa_movimentos")
+          .select("entrada, saida, saldo_anterior, data, created_at");
+        if (movErr) throw movErr;
+        const arr = movs ?? [];
+        let saldoBase = 0;
+        if (arr.length) {
+          const sorted = [...arr].sort((a: any, b: any) => {
+            const [da, ma] = String(a.data ?? "").split("/").map((x) => parseInt(x, 10));
+            const [db, mb] = String(b.data ?? "").split("/").map((x) => parseInt(x, 10));
+            if ((ma || 0) !== (mb || 0)) return (ma || 0) - (mb || 0);
+            if ((da || 0) !== (db || 0)) return (da || 0) - (db || 0);
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          });
+          saldoBase = Number(sorted[0].saldo_anterior || 0);
+        }
+        const totalEnt = arr.reduce((s: number, m: any) => s + Number(m.entrada || 0), 0);
+        const totalSai = arr.reduce((s: number, m: any) => s + Number(m.saida || 0), 0);
+        saldo_caixa = saldoBase + totalEnt - totalSai;
+
+        usuario = usuario ?? "Envio automático";
+      } else {
+        carteira_valor = Number(payload?.carteira_valor ?? 0);
+        carteira_notas = Number(payload?.carteira_notas ?? 0);
+        prioridade_valor = Number(payload?.prioridade_valor ?? 0);
+        prioridade_notas = Number(payload?.prioridade_notas ?? 0);
+        saldo_caixa = Number(payload?.saldo_caixa ?? 0);
+      }
+
+      const cobertura = carteira_valor > 0
+        ? ((saldo_caixa / carteira_valor) * 100).toFixed(0)
         : "—";
 
       const now = new Date();
-      const dataBR = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-      const horaBR = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+      const dataBR = now.toLocaleDateString("pt-BR", { timeZone: "America/Fortaleza" });
+      const horaBR = now.toLocaleTimeString("pt-BR", { timeZone: "America/Fortaleza", hour: "2-digit", minute: "2-digit" });
 
       const linhas = [
         "📊 <b>Status Geral — Grupo Ley</b>",
         "",
-        `📅 <b>${escapeHtml(dataBR)} · ${horaBR}</b>`,
+        `📅 <b>${escapeHtml(dataBR)} · ${escapeHtml(horaBR)}</b>`,
         "",
-        `💼 <b>Carteira a enviar:</b>  ${escapeHtml(brl(Number(carteira_valor)))}  <i>(${escapeHtml(String(carteira_notas))} nota${Number(carteira_notas) === 1 ? "" : "s"})</i>`,
-        `💵 <b>Saldo em casa:</b>  ${escapeHtml(brl(Number(saldo_caixa)))}`,
+        `💵 <b>Saldo em casa:</b>  ${escapeHtml(brl(saldo_caixa))}`,
+        `💼 <b>Total Carteira:</b>  ${escapeHtml(brl(carteira_valor))}  <i>(${carteira_notas} nota${carteira_notas === 1 ? "" : "s"})</i>`,
+        `🚨 <b>Prioridade no envio:</b>  ${escapeHtml(brl(prioridade_valor))}  <i>(${prioridade_notas} ${prioridade_notas === 1 ? "nota já chegou" : "notas já chegaram"})</i>`,
         `🎯 <b>Cobertura:</b>  ${escapeHtml(cobertura)}%`,
       ];
       if (usuario) linhas.push("", `👤 <b>Solicitado por:</b> ${escapeHtml(String(usuario))}`);
