@@ -28,13 +28,14 @@ export function AppHeader() {
         usuario = prof?.display_name || prof?.email || s.session?.user.email || null;
       }
       const carteiraNFs = notas.filter((n) => !isEnviado(n));
-      // Chama RPC que lê o token do vault e envia direto para a API do Telegram
-      // sem depender do deploy da edge function
-      const { data, error } = await supabase.rpc("send_status_telegram", {
-        p_carteira_valor: carteiraNFs.reduce((acc, n) => acc + n.valor, 0),
-        p_carteira_notas: carteiraNFs.length,
-        p_saldo_caixa: saldoAtual,
-        p_usuario: usuario ?? undefined,
+      const { data, error } = await supabase.functions.invoke("telegram-notify", {
+        body: {
+          type: "resumo_geral",
+          carteira_valor: carteiraNFs.reduce((acc, n) => acc + n.valor, 0),
+          carteira_notas: carteiraNFs.length,
+          saldo_caixa: saldoAtual,
+          usuario: usuario ?? undefined,
+        },
       });
       if (error) throw error;
       const result = data as { ok?: boolean; error?: string } | null;
