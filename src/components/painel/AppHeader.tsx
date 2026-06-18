@@ -28,11 +28,17 @@ export function AppHeader() {
         usuario = prof?.display_name || prof?.email || s.session?.user.email || null;
       }
       const carteiraNFs = notas.filter((n) => !isEnviado(n));
+      const prioridadeNFs = carteiraNFs.filter((n) => {
+        const e = (n.entrega ?? "").toUpperCase();
+        return e.includes("CHEGOU") && !e.includes("NÃO") && !e.includes("NAO");
+      });
       const { data, error } = await supabase.functions.invoke("telegram-notify", {
         body: {
           type: "resumo_geral",
           carteira_valor: carteiraNFs.reduce((acc, n) => acc + n.valor, 0),
           carteira_notas: carteiraNFs.length,
+          prioridade_valor: prioridadeNFs.reduce((acc, n) => acc + n.valor, 0),
+          prioridade_notas: prioridadeNFs.length,
           saldo_caixa: saldoAtual,
           usuario: usuario ?? undefined,
         },
