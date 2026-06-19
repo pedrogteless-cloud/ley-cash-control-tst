@@ -263,11 +263,6 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
     return anteriores[anteriores.length - 1].saldoTotal;
   };
 
-  // Saídas automáticas do dia (para modo simples)
-  const saidaHoje = caixa
-    .filter((c) => c.data === (initial?.data ?? todayStr) && (!initial || c.id !== initial.id))
-    .reduce((s, c) => s + c.saida, 0);
-
   const [dataStr, setDataStr] = useState(initial?.data ?? todayStr);
   const [entradaStr, setEntradaStr] = useState(formatBrlInput(initial?.entrada ?? 0));
   const [saidaStr, setSaidaStr] = useState(formatBrlInput(initial?.saida ?? 0));
@@ -280,7 +275,7 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
 
   const saldoAnt = saldoAnteriorDerived(dataStr);
   const ent = parseBrlInput(entradaStr);
-  const sai = modoSimples ? saidaHoje : parseBrlInput(saidaStr);
+  const sai = parseBrlInput(saidaStr);
   const total = Math.round((saldoAnt + ent - sai) * 100) / 100;
 
   const submit = async (e: React.FormEvent) => {
@@ -324,7 +319,7 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
       </Field>
 
       {modoSimples ? (
-        <>
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Entrada (R$)">
             <input
               value={entradaStr}
@@ -334,16 +329,16 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
               placeholder="0,00"
             />
           </Field>
-          {saidaHoje > 0 && (
-            <div className="rounded-lg border border-orange/30 bg-orange-dim/30 px-3 py-2 text-xs">
-              <span className="font-semibold text-orange">Saídas automáticas do dia:</span>{" "}
-              <span className="text-foreground">{brl(saidaHoje)}</span>
-              <div className="mt-0.5 text-[11px] text-muted-foreground">
-                Lançadas pelas baixas de cheque das NFs.
-              </div>
-            </div>
-          )}
-        </>
+          <Field label="Saída (R$)">
+            <input
+              value={saidaStr}
+              onChange={(e) => setSaidaStr(e.target.value)}
+              inputMode="decimal"
+              className={inputCls()}
+              placeholder="0,00"
+            />
+          </Field>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3">
