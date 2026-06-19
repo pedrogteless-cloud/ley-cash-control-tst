@@ -230,6 +230,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ============ Valor de NF editado (chamado via trigger) ============
+    if (payload?.type === "nf_valor_editada") {
+      const fornecedor = String(payload.fornecedor ?? "");
+      const nf = String(payload.nf ?? "");
+      const filial = String(payload.filial ?? "");
+      const valorAntigo = Number(payload.valor_antigo ?? 0);
+      const valorNovo = Number(payload.valor_novo ?? 0);
+      const delta = Math.round((valorNovo - valorAntigo) * 100) / 100;
+      const aumentou = delta >= 0;
+      const actor = String(payload?.actor_name ?? "").trim();
+
+      const linhas = [
+        "✏️ <b>Valor de NF editado — Grupo Ley</b>",
+        "",
+        `🏭 <b>Fornecedor:</b> ${escapeHtml(fornecedor)}`,
+        `🧾 <b>NF:</b> ${escapeHtml(nf)}`,
+        `🏢 <b>Filial:</b> ${escapeHtml(filial)}`,
+        "",
+        `${aumentou ? "📈" : "📉"} <b>De</b> ${escapeHtml(brl(valorAntigo))} <b>→</b> ${escapeHtml(brl(valorNovo))}`,
+        `${aumentou ? "🔺" : "🔻"} <b>${aumentou ? "Aumento de" : "Redução de"}</b> ${escapeHtml(brl(Math.abs(delta)))}`,
+      ].join("\n") + (actor ? `\n\n👤 <b>Ação executada por:</b> ${escapeHtml(actor)}` : "");
+
+      await sendTelegramOrThrow(linhas);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ============ Cheque enviado (chamado pelo cliente) ============
     if (payload?.type === "cheque_enviado" && Array.isArray(payload.notas)) {
       const notas = payload.notas as NfPayload[];
