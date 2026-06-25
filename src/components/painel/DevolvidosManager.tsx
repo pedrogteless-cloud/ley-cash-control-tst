@@ -291,51 +291,105 @@ export function DevolvidosManager() {
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Data">
-            <input
-              type="date"
-              value={form.data}
-              onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
-              required
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Valor devolvido (R$)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.valor_devolvido || ""}
-              onChange={(e) => setForm((f) => ({ ...f, valor_devolvido: Number(e.target.value) }))}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Recuperado — fornecedor (R$)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.valor_rec_fornecedor || ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, valor_rec_fornecedor: Number(e.target.value) }))
-              }
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Recuperado — empresa/Ley (R$)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.valor_rec_empresa || ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, valor_rec_empresa: Number(e.target.value) }))
-              }
-              className={inputCls}
-            />
-          </Field>
-        </div>
+        {/* Toggle de modo (não aparece em edição) */}
+        {!editingId && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setMode("devolvido"); setForm(emptyForm()); }}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                mode === "devolvido"
+                  ? "border-gold bg-gold/10 text-gold"
+                  : "border-border bg-surface text-soft-foreground hover:text-foreground"
+              }`}
+            >
+              Cheque devolvido
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("avulsa"); setForm(emptyForm()); }}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                mode === "avulsa"
+                  ? "border-blue bg-blue-dim text-blue"
+                  : "border-border bg-surface text-soft-foreground hover:text-foreground"
+              }`}
+            >
+              Recuperação avulsa
+            </button>
+          </div>
+        )}
+
+        {mode === "avulsa" ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Data">
+              <input
+                type="date"
+                value={form.data}
+                onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
+                required
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Valor recuperado (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_rec_empresa || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valor_rec_empresa: Number(e.target.value) }))
+                }
+                className={inputCls}
+              />
+            </Field>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Data">
+              <input
+                type="date"
+                value={form.data}
+                onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
+                required
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Valor devolvido (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_devolvido || ""}
+                onChange={(e) => setForm((f) => ({ ...f, valor_devolvido: Number(e.target.value) }))}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Recuperado — fornecedor (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_rec_fornecedor || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valor_rec_fornecedor: Number(e.target.value) }))
+                }
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Recuperado — empresa/Ley (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_rec_empresa || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valor_rec_empresa: Number(e.target.value) }))
+                }
+                className={inputCls}
+              />
+            </Field>
+          </div>
+        )}
 
         <div className="flex justify-end">
           <button
@@ -349,16 +403,17 @@ export function DevolvidosManager() {
         </div>
       </form>
 
-      {/* ── KPIs deste mês ───────────────────────────────────────────────── */}
+      {/* ── KPIs ─────────────────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiBox label="Voltou este mês" value={brl(totals.voltou)} tone="text-red" />
-        <KpiBox label="Recuperado" value={brl(totals.recuperado)} tone="text-blue" />
+        <KpiBox label="Recuperado este mês" value={brl(totals.recuperado)} tone="text-blue" />
         <KpiBox
-          label="Pendente"
-          value={totals.pendente <= 0 ? "✓ Tudo quitado" : brl(totals.pendente)}
-          tone={totals.pendente <= 0 ? "text-green" : totals.pendente >= totals.voltou ? "text-red" : "text-gold"}
+          label="Pendente geral"
+          value={totals.pendenteGeral <= 0 ? "✓ Tudo quitado" : brl(totals.pendenteGeral)}
+          tone={totals.pendenteGeral <= 0 ? "text-green" : "text-gold"}
         />
       </div>
+
 
       {/* ── Tabela: mês atual (detalhe) ──────────────────────────────────── */}
       <EntriesTable
