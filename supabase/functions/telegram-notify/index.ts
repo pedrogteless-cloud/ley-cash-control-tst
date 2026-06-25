@@ -166,52 +166,54 @@ Deno.serve(async (req) => {
     if (payload?.type === "devolvido_atualizado") {
       const {
         data,
-        rec_fornecedor,
-        rec_empresa,
-        rec_fornecedor_delta,
-        rec_empresa_delta,
-        total_recuperado_novo,
+        recuperacao_avulsa,
         total_recuperado_delta,
         total_recuperado_lancamento,
         total_recuperado_acumulado,
-        pendente,
         pendente_lancamento,
         pendente_acumulado,
       } = payload ?? {};
 
-      // Format YYYY-MM-DD → DD/MM/YYYY
       const parts = String(data ?? "").split("-");
       const dataFmt = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : String(data ?? "");
-      const recFornecedorNovo = rec_fornecedor_delta ?? rec_fornecedor;
-      const recEmpresaNovo = rec_empresa_delta ?? rec_empresa;
-      const totalNovo = total_recuperado_delta ?? total_recuperado_novo ?? 0;
-      const totalLancamento = total_recuperado_lancamento ?? total_recuperado_novo ?? 0;
-      const pendenteLancamento = pendente_lancamento ?? pendente ?? 0;
-      const pendenteAcumulado = pendente_acumulado ?? pendente ?? 0;
+      const totalNovo = Number(total_recuperado_delta ?? 0);
+      const totalLancamento = Number(total_recuperado_lancamento ?? 0);
+      const totalAcumulado = Number(total_recuperado_acumulado ?? 0);
+      const pendAcum = Number(pendente_acumulado ?? 0);
+      const actor = String(payload?.actor_name ?? "").trim();
 
-      const linhas: string[] = [
-        "♻️ <b>Recuperação de cheque atualizada — Grupo Ley</b>",
-        "",
-        `📅 <b>Lançamento de:</b> ${escapeHtml(dataFmt)}`,
-      ];
-      if (recFornecedorNovo !== null && recFornecedorNovo !== undefined) {
-        linhas.push(`💰 <b>Novo rec. fornecedor:</b> ${escapeHtml(brl(Number(recFornecedorNovo)))}`);
+      const linhas: string[] = [];
+      if (recuperacao_avulsa) {
+        linhas.push(
+          "♻️ <b>Recuperação avulsa de cheque — Grupo Ley</b>",
+          "",
+          `📅 <b>Data:</b> ${escapeHtml(dataFmt)}`,
+          `💰 <b>Valor recuperado:</b> ${escapeHtml(brl(totalLancamento))}`,
+          "",
+          `📊 <b>Total acumulado:</b> ${escapeHtml(brl(totalAcumulado))}`,
+          `⏳ <b>Pendente acumulado:</b> ${escapeHtml(brl(pendAcum))}`,
+        );
+      } else {
+        linhas.push(
+          "♻️ <b>Recuperação de cheque atualizada — Grupo Ley</b>",
+          "",
+          `📅 <b>Lançamento de:</b> ${escapeHtml(dataFmt)}`,
+          `💰 <b>Valor recuperado:</b> ${escapeHtml(brl(totalNovo))}`,
+          "",
+          `🧾 <b>Recuperado no lançamento:</b> ${escapeHtml(brl(totalLancamento))}`,
+          `⏳ <b>Pendente no lançamento:</b> ${escapeHtml(brl(Number(pendente_lancamento ?? 0)))}`,
+          `📊 <b>Total acumulado:</b> ${escapeHtml(brl(totalAcumulado))}`,
+          `⏳ <b>Pendente acumulado:</b> ${escapeHtml(brl(pendAcum))}`,
+        );
       }
-      if (recEmpresaNovo !== null && recEmpresaNovo !== undefined) {
-        linhas.push(`🏢 <b>Novo rec. empresa (Ley):</b> ${escapeHtml(brl(Number(recEmpresaNovo)))}`);
-      }
-      linhas.push("");
-      linhas.push(`✅ <b>Total recuperado agora:</b> ${escapeHtml(brl(Number(totalNovo)))}`);
-      linhas.push(`🧾 <b>Recuperado no lançamento:</b> ${escapeHtml(brl(Number(totalLancamento)))}`);
-      linhas.push(`⏳ <b>Pendente no lançamento:</b> ${escapeHtml(brl(Number(pendenteLancamento)))}`);
-      linhas.push(`📊 <b>Total acumulado:</b> ${escapeHtml(brl(Number(total_recuperado_acumulado ?? 0)))}`);
-      linhas.push(`⏳ <b>Pendente acumulado:</b> ${escapeHtml(brl(Number(pendenteAcumulado)))}`);
+      if (actor) linhas.push("", `👤 <b>Ação executada por:</b> ${escapeHtml(actor)}`);
 
       await sendTelegramOrThrow(linhas.join("\n"));
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     // ============ Envio de cheque com baixa automática (novo fluxo multi-NF) ============
     if (payload?.type === "envio_cheque") {
