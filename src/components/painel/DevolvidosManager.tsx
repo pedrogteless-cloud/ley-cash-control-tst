@@ -70,8 +70,11 @@ function fmtMonthBR(ym: string) {
   return `${m}/${y}`;
 }
 
+type Mode = "devolvido" | "avulsa";
+
 export function DevolvidosManager() {
   const qc = useQueryClient();
+  const [mode, setMode] = useState<Mode>("devolvido");
   const [form, setForm] = useState<FormState>(emptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
@@ -94,6 +97,8 @@ export function DevolvidosManager() {
     if (!editingId) return;
     const r = rows.find((x) => x.id === editingId);
     if (r) {
+      const isAvulsa = Number(r.valor_devolvido) <= 0 && (Number(r.valor_rec_fornecedor) + Number(r.valor_rec_empresa)) > 0;
+      setMode(isAvulsa ? "avulsa" : "devolvido");
       setForm({
         data: r.data,
         valor_devolvido: r.valor_devolvido,
@@ -142,6 +147,7 @@ export function DevolvidosManager() {
       qc.invalidateQueries({ queryKey: ["cheques_devolvidos"] });
       setEditingId(null);
       setForm(emptyForm());
+      setMode("devolvido");
     },
     onError: (e: Error) => toast.error(mutationMessage(e)),
   });
@@ -167,11 +173,31 @@ export function DevolvidosManager() {
   const cancelEdit = () => {
     setEditingId(null);
     setForm(emptyForm());
+    setMode("devolvido");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.data) return;
+
+    if (mode === "avulsa") {
+      // Em recuperação avulsa, usamos só "valor recuperado" => grava em valor_rec_empresa
+      const recuperado = Number(form.valor_rec_empresa);
+      if (!Number.isFinite(recuperado) || recuperado <= 0) {
+        toast.error("Informe o valor recuperado");
+        return;
+      }
+      const payload: FormState = {
+        data: form.data,
+        valor_devolvido: 0,
+        valor_rec_fornecedor: 0,
+        valor_rec_empresa: recuperado,
+      };
+      if (editingId) updateMut.mutate({ ...payload, id: editingId });
+      else insertMut.mutate(payload);
+      return;
+    }
+
     if (
       !Number.isFinite(form.valor_devolvido) ||
       !Number.isFinite(form.valor_rec_fornecedor) ||
@@ -193,12 +219,8 @@ export function DevolvidosManager() {
       toast.error("O total recuperado não pode ser maior que o valor devolvido");
       return;
     }
-    const noValues =
-      form.valor_devolvido <= 0 &&
-      form.valor_rec_fornecedor <= 0 &&
-      form.valor_rec_empresa <= 0;
-    if (noValues && !editingId) {
-      toast.error("Informe ao menos um valor");
+    if (form.valor_devolvido <= 0 && !editingId) {
+      toast.error("Informe o valor devolvido");
       return;
     }
     if (editingId) {
@@ -209,6 +231,7 @@ export function DevolvidosManager() {
   };
 
   const isPending = insertMut.isPending || updateMut.isPending;
+
 
   // ── Derived data ─────────────────────────────────────────────────────────
   const currentYM = ymKey(todayISO());
@@ -222,8 +245,20 @@ export function DevolvidosManager() {
     const voltou = monthRows.reduce((s, r) => s + Number(r.valor_devolvido || 0), 0);
     const recF = monthRows.reduce((s, r) => s + Number(r.valor_rec_fornecedor || 0), 0);
     const recE = monthRows.reduce((s, r) => s + Number(r.valor_rec_empresa || 0), 0);
-    return { voltou, recuperado: recF + recE, pendente: voltou - recF - recE };
-  }, [monthRows]);
+    const recuperado = recF + recE;
+    // Pendente geral: considera apenas devolvidos vs recuperados; recuperação avulsa abate.
+    const allVoltou = rows.reduce((s, r) => s + Number(r.valor_devolvido || 0), 0);
+    const allRec = rows.reduce(
+      (s, r) => s + Number(r.valor_rec_fornecedor || 0) + Number(r.valor_rec_empresa || 0),
+      0,
+    );
+    return {
+      voltou,
+      recuperado,
+      pendenteGeral: allVoltou - allRec,
+    };
+  }, [monthRows, rows]);
+
 
   const prevRows = useMemo(
     () => rows.filter((r) => ymKey(r.data) !== currentYM),
@@ -256,51 +291,105 @@ export function DevolvidosManager() {
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Data">
-            <input
-              type="date"
-              value={form.data}
-              onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
-              required
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Valor devolvido (R$)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.valor_devolvido || ""}
-              onChange={(e) => setForm((f) => ({ ...f, valor_devolvido: Number(e.target.value) }))}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Recuperado — fornecedor (R$)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.valor_rec_fornecedor || ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, valor_rec_fornecedor: Number(e.target.value) }))
-              }
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Recuperado — empresa/Ley (R$)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.valor_rec_empresa || ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, valor_rec_empresa: Number(e.target.value) }))
-              }
-              className={inputCls}
-            />
-          </Field>
-        </div>
+        {/* Toggle de modo (não aparece em edição) */}
+        {!editingId && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setMode("devolvido"); setForm(emptyForm()); }}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                mode === "devolvido"
+                  ? "border-gold bg-gold/10 text-gold"
+                  : "border-border bg-surface text-soft-foreground hover:text-foreground"
+              }`}
+            >
+              Cheque devolvido
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("avulsa"); setForm(emptyForm()); }}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                mode === "avulsa"
+                  ? "border-blue bg-blue-dim text-blue"
+                  : "border-border bg-surface text-soft-foreground hover:text-foreground"
+              }`}
+            >
+              Recuperação avulsa
+            </button>
+          </div>
+        )}
+
+        {mode === "avulsa" ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Data">
+              <input
+                type="date"
+                value={form.data}
+                onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
+                required
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Valor recuperado (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_rec_empresa || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valor_rec_empresa: Number(e.target.value) }))
+                }
+                className={inputCls}
+              />
+            </Field>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Data">
+              <input
+                type="date"
+                value={form.data}
+                onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
+                required
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Valor devolvido (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_devolvido || ""}
+                onChange={(e) => setForm((f) => ({ ...f, valor_devolvido: Number(e.target.value) }))}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Recuperado — fornecedor (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_rec_fornecedor || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valor_rec_fornecedor: Number(e.target.value) }))
+                }
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Recuperado — empresa/Ley (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_rec_empresa || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valor_rec_empresa: Number(e.target.value) }))
+                }
+                className={inputCls}
+              />
+            </Field>
+          </div>
+        )}
 
         <div className="flex justify-end">
           <button
@@ -314,16 +403,17 @@ export function DevolvidosManager() {
         </div>
       </form>
 
-      {/* ── KPIs deste mês ───────────────────────────────────────────────── */}
+      {/* ── KPIs ─────────────────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiBox label="Voltou este mês" value={brl(totals.voltou)} tone="text-red" />
-        <KpiBox label="Recuperado" value={brl(totals.recuperado)} tone="text-blue" />
+        <KpiBox label="Recuperado este mês" value={brl(totals.recuperado)} tone="text-blue" />
         <KpiBox
-          label="Pendente"
-          value={totals.pendente <= 0 ? "✓ Tudo quitado" : brl(totals.pendente)}
-          tone={totals.pendente <= 0 ? "text-green" : totals.pendente >= totals.voltou ? "text-red" : "text-gold"}
+          label="Pendente geral"
+          value={totals.pendenteGeral <= 0 ? "✓ Tudo quitado" : brl(totals.pendenteGeral)}
+          tone={totals.pendenteGeral <= 0 ? "text-green" : "text-gold"}
         />
       </div>
+
 
       {/* ── Tabela: mês atual (detalhe) ──────────────────────────────────── */}
       <EntriesTable
@@ -409,9 +499,9 @@ function EntriesTable({
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3 font-medium">Data</th>
+              <th className="px-4 py-3 font-medium">Tipo</th>
               <th className="px-4 py-3 text-right font-medium">Voltou</th>
-              <th className="px-4 py-3 text-right font-medium">Rec. Fornecedor</th>
-              <th className="px-4 py-3 text-right font-medium">Rec. Empresa</th>
+              <th className="px-4 py-3 text-right font-medium">Recuperado</th>
               <th className="px-4 py-3 text-right font-medium">Pendente</th>
               <th className="px-4 py-3 text-right font-medium">Ações</th>
             </tr>
@@ -421,9 +511,11 @@ function EntriesTable({
               const devolvido = Number(r.valor_devolvido);
               const recF = Number(r.valor_rec_fornecedor);
               const recE = Number(r.valor_rec_empresa);
-              const pend = devolvido - recF - recE;
-              const quitado = pend <= 0;
-              const semRecuperacao = recF === 0 && recE === 0 && devolvido > 0;
+              const recuperado = recF + recE;
+              const isAvulsa = devolvido <= 0 && recuperado > 0;
+              const pend = devolvido - recuperado;
+              const quitado = !isAvulsa && pend <= 0 && devolvido > 0;
+              const semRecuperacao = recuperado === 0 && devolvido > 0;
               const isActive = editingId === r.id;
               return (
                 <tr
@@ -439,17 +531,25 @@ function EntriesTable({
                   <td className="px-4 py-3 font-semibold text-foreground">
                     {fmtDateBR(r.data)}
                   </td>
+                  <td className="px-4 py-3 text-xs">
+                    {isAvulsa ? (
+                      <span className="inline-flex rounded-md bg-blue-dim px-2 py-0.5 font-semibold text-blue">
+                        Recuperação avulsa
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Cheque devolvido</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold text-red">
-                    {brl(devolvido)}
+                    {devolvido > 0 ? brl(devolvido) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-blue">
-                    {recF > 0 ? brl(recF) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right text-blue">
-                    {recE > 0 ? brl(recE) : <span className="text-muted-foreground">—</span>}
+                    {recuperado > 0 ? brl(recuperado) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-bold">
-                    {quitado ? (
+                    {isAvulsa ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : quitado ? (
                       <span className="text-green">✓ Quitado</span>
                     ) : semRecuperacao ? (
                       <span className="text-red">{brl(pend)}</span>
@@ -491,6 +591,7 @@ function EntriesTable({
               </tr>
             )}
           </tbody>
+
         </table>
       </div>
     </div>
