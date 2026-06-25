@@ -70,8 +70,11 @@ function fmtMonthBR(ym: string) {
   return `${m}/${y}`;
 }
 
+type Mode = "devolvido" | "avulsa";
+
 export function DevolvidosManager() {
   const qc = useQueryClient();
+  const [mode, setMode] = useState<Mode>("devolvido");
   const [form, setForm] = useState<FormState>(emptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
@@ -94,6 +97,8 @@ export function DevolvidosManager() {
     if (!editingId) return;
     const r = rows.find((x) => x.id === editingId);
     if (r) {
+      const isAvulsa = Number(r.valor_devolvido) <= 0 && (Number(r.valor_rec_fornecedor) + Number(r.valor_rec_empresa)) > 0;
+      setMode(isAvulsa ? "avulsa" : "devolvido");
       setForm({
         data: r.data,
         valor_devolvido: r.valor_devolvido,
@@ -142,6 +147,7 @@ export function DevolvidosManager() {
       qc.invalidateQueries({ queryKey: ["cheques_devolvidos"] });
       setEditingId(null);
       setForm(emptyForm());
+      setMode("devolvido");
     },
     onError: (e: Error) => toast.error(mutationMessage(e)),
   });
@@ -167,11 +173,31 @@ export function DevolvidosManager() {
   const cancelEdit = () => {
     setEditingId(null);
     setForm(emptyForm());
+    setMode("devolvido");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.data) return;
+
+    if (mode === "avulsa") {
+      // Em recuperação avulsa, usamos só "valor recuperado" => grava em valor_rec_empresa
+      const recuperado = Number(form.valor_rec_empresa);
+      if (!Number.isFinite(recuperado) || recuperado <= 0) {
+        toast.error("Informe o valor recuperado");
+        return;
+      }
+      const payload: FormState = {
+        data: form.data,
+        valor_devolvido: 0,
+        valor_rec_fornecedor: 0,
+        valor_rec_empresa: recuperado,
+      };
+      if (editingId) updateMut.mutate({ ...payload, id: editingId });
+      else insertMut.mutate(payload);
+      return;
+    }
+
     if (
       !Number.isFinite(form.valor_devolvido) ||
       !Number.isFinite(form.valor_rec_fornecedor) ||
@@ -193,12 +219,8 @@ export function DevolvidosManager() {
       toast.error("O total recuperado não pode ser maior que o valor devolvido");
       return;
     }
-    const noValues =
-      form.valor_devolvido <= 0 &&
-      form.valor_rec_fornecedor <= 0 &&
-      form.valor_rec_empresa <= 0;
-    if (noValues && !editingId) {
-      toast.error("Informe ao menos um valor");
+    if (form.valor_devolvido <= 0 && !editingId) {
+      toast.error("Informe o valor devolvido");
       return;
     }
     if (editingId) {
@@ -209,6 +231,7 @@ export function DevolvidosManager() {
   };
 
   const isPending = insertMut.isPending || updateMut.isPending;
+
 
   // ── Derived data ─────────────────────────────────────────────────────────
   const currentYM = ymKey(todayISO());
