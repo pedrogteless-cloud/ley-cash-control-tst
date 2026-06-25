@@ -499,9 +499,9 @@ function EntriesTable({
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3 font-medium">Data</th>
+              <th className="px-4 py-3 font-medium">Tipo</th>
               <th className="px-4 py-3 text-right font-medium">Voltou</th>
-              <th className="px-4 py-3 text-right font-medium">Rec. Fornecedor</th>
-              <th className="px-4 py-3 text-right font-medium">Rec. Empresa</th>
+              <th className="px-4 py-3 text-right font-medium">Recuperado</th>
               <th className="px-4 py-3 text-right font-medium">Pendente</th>
               <th className="px-4 py-3 text-right font-medium">Ações</th>
             </tr>
@@ -511,9 +511,11 @@ function EntriesTable({
               const devolvido = Number(r.valor_devolvido);
               const recF = Number(r.valor_rec_fornecedor);
               const recE = Number(r.valor_rec_empresa);
-              const pend = devolvido - recF - recE;
-              const quitado = pend <= 0;
-              const semRecuperacao = recF === 0 && recE === 0 && devolvido > 0;
+              const recuperado = recF + recE;
+              const isAvulsa = devolvido <= 0 && recuperado > 0;
+              const pend = devolvido - recuperado;
+              const quitado = !isAvulsa && pend <= 0 && devolvido > 0;
+              const semRecuperacao = recuperado === 0 && devolvido > 0;
               const isActive = editingId === r.id;
               return (
                 <tr
@@ -529,17 +531,25 @@ function EntriesTable({
                   <td className="px-4 py-3 font-semibold text-foreground">
                     {fmtDateBR(r.data)}
                   </td>
+                  <td className="px-4 py-3 text-xs">
+                    {isAvulsa ? (
+                      <span className="inline-flex rounded-md bg-blue-dim px-2 py-0.5 font-semibold text-blue">
+                        Recuperação avulsa
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Cheque devolvido</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold text-red">
-                    {brl(devolvido)}
+                    {devolvido > 0 ? brl(devolvido) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-blue">
-                    {recF > 0 ? brl(recF) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right text-blue">
-                    {recE > 0 ? brl(recE) : <span className="text-muted-foreground">—</span>}
+                    {recuperado > 0 ? brl(recuperado) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-bold">
-                    {quitado ? (
+                    {isAvulsa ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : quitado ? (
                       <span className="text-green">✓ Quitado</span>
                     ) : semRecuperacao ? (
                       <span className="text-red">{brl(pend)}</span>
@@ -581,6 +591,7 @@ function EntriesTable({
               </tr>
             )}
           </tbody>
+
         </table>
       </div>
     </div>
