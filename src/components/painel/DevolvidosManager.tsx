@@ -245,8 +245,20 @@ export function DevolvidosManager() {
     const voltou = monthRows.reduce((s, r) => s + Number(r.valor_devolvido || 0), 0);
     const recF = monthRows.reduce((s, r) => s + Number(r.valor_rec_fornecedor || 0), 0);
     const recE = monthRows.reduce((s, r) => s + Number(r.valor_rec_empresa || 0), 0);
-    return { voltou, recuperado: recF + recE, pendente: voltou - recF - recE };
-  }, [monthRows]);
+    const recuperado = recF + recE;
+    // Pendente geral: considera apenas devolvidos vs recuperados; recuperação avulsa abate.
+    const allVoltou = rows.reduce((s, r) => s + Number(r.valor_devolvido || 0), 0);
+    const allRec = rows.reduce(
+      (s, r) => s + Number(r.valor_rec_fornecedor || 0) + Number(r.valor_rec_empresa || 0),
+      0,
+    );
+    return {
+      voltou,
+      recuperado,
+      pendenteGeral: allVoltou - allRec,
+    };
+  }, [monthRows, rows]);
+
 
   const prevRows = useMemo(
     () => rows.filter((r) => ymKey(r.data) !== currentYM),
