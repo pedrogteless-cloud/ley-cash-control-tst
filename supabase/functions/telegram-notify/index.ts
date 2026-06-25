@@ -358,22 +358,33 @@ Deno.serve(async (req) => {
       const devolvido = Number(record.valor_devolvido) || 0;
       const recF = Number(record.valor_rec_fornecedor) || 0;
       const recE = Number(record.valor_rec_empresa) || 0;
-      const pendente = devolvido - recF - recE;
+      const totalRec = recF + recE;
+      const pendente = devolvido - totalRec;
+      const isAvulsa = devolvido <= 0 && totalRec > 0;
 
       const [y, m, d] = String(record.data ?? "").split("-");
       const dataBR = y && m && d ? `${d}/${m}/${y}` : String(record.data ?? "");
 
-      const linhas = [
-        "😕 <b>Cheques devolvidos!</b>",
-        `📅 <b>Data:</b> ${escapeHtml(dataBR)}`,
-        `💸 <b>Valor devolvido:</b> ${escapeHtml(brl(devolvido))}`,
-        recF > 0 ? `🤝 <b>Recuperado fornecedor:</b> ${escapeHtml(brl(recF))}` : "",
-        recE > 0 ? `🏢 <b>Recuperado empresa:</b> ${escapeHtml(brl(recE))}` : "",
-        `⏳ <b>Pendente:</b> ${escapeHtml(brl(pendente))}`,
-      ].filter(Boolean).join("\n") + actorLine;
+      let linhas: string;
+      if (isAvulsa) {
+        linhas = [
+          "♻️ <b>Recuperação avulsa de cheque — Grupo Ley</b>",
+          `📅 <b>Data:</b> ${escapeHtml(dataBR)}`,
+          `💰 <b>Valor recuperado:</b> ${escapeHtml(brl(totalRec))}`,
+        ].join("\n") + actorLine;
+      } else {
+        linhas = [
+          "😕 <b>Cheques devolvidos!</b>",
+          `📅 <b>Data:</b> ${escapeHtml(dataBR)}`,
+          `💸 <b>Valor devolvido:</b> ${escapeHtml(brl(devolvido))}`,
+          totalRec > 0 ? `💰 <b>Valor recuperado:</b> ${escapeHtml(brl(totalRec))}` : "",
+          `⏳ <b>Pendente:</b> ${escapeHtml(brl(pendente))}`,
+        ].filter(Boolean).join("\n") + actorLine;
+      }
 
       await sendTelegramOrThrow(linhas);
     }
+
 
 
     return new Response(JSON.stringify({ ok: true }), {
