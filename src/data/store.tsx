@@ -224,7 +224,7 @@ export function useStore() {
         .order("data", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return computeChain((data as CaixaRow[]).map(mapCaixa));
+      return computeChain(sortCaixaRowsForBalance(data as CaixaRow[]).map(mapCaixa));
     },
   });
 
