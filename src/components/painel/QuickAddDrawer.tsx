@@ -281,7 +281,13 @@ function CaixaForm({ initial, onDone }: { initial: CaixaRecord | null; onDone: (
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!dataStr.trim()) errs.data = "Informe a data";
+    if (!/^\d{2}\/\d{2}$/.test(dataStr.trim())) {
+      errs.data = "Data inválida — use o formato DD/MM";
+    } else {
+      const [dd, mm] = dataStr.split("/").map(Number);
+      if (mm < 1 || mm > 12) errs.data = "Mês inválido (01–12)";
+      else if (dd < 1 || dd > 31) errs.data = "Dia inválido (01–31)";
+    }
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
