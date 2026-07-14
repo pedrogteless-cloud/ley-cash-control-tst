@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Save, Trash2, X } from "lucide-react";
+import { FileSpreadsheet, Loader2, Pencil, PlusCircle, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
+import { buildDevolvidosWorkbook } from "@/lib/excel-devolvidos";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +31,8 @@ type FormState = {
   valor_rec_fornecedor: number;
   valor_rec_empresa: number;
 };
+
+type LaunchMode = "devolvido" | "recuperacao";
 
 const inputCls =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold";
@@ -70,11 +73,17 @@ function fmtMonthBR(ym: string) {
   return `${m}/${y}`;
 }
 
+function rowRecovered(r: Pick<Row, "valor_rec_fornecedor" | "valor_rec_empresa">) {
+  return Number(r.valor_rec_fornecedor || 0) + Number(r.valor_rec_empresa || 0);
+}
+
 export function DevolvidosManager() {
   const qc = useQueryClient();
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [mode, setMode] = useState<LaunchMode>("devolvido");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["cheques_devolvidos"],
@@ -94,14 +103,36 @@ export function DevolvidosManager() {
     if (!editingId) return;
     const r = rows.find((x) => x.id === editingId);
     if (r) {
+      setMode(isRecoveryOnly(r) ? "recuperacao" : "devolvido");
       setForm({
         data: r.data,
         valor_devolvido: r.valor_devolvido,
-        valor_rec_fornecedor: r.valor_rec_fornecedor,
-        valor_rec_empresa: r.valor_rec_empresa,
+        valor_rec_fornecedor: 0,
+        valor_rec_empresa: rowRecovered(r),
       });
     }
   }, [editingId, rows]);
+
+  // ── Excel export ────────────────────────────────────────────────────────
+  const exportToExcel = async () => {
+    setExporting(true);
+    try {
+      const blob = await buildDevolvidosWorkbook(rows);
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      const today = new Date().toISOString().slice(0, 10);
+      a.href     = url;
+      a.download = `Ley_ChequesDevolvidos_${today}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Planilha exportada com sucesso");
+    } catch (e) {
+      toast.error("Erro ao exportar planilha");
+      console.error(e);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ── Insert mutation ──────────────────────────────────────────────────────
   const insertMut = useMutation({
@@ -166,6 +197,7 @@ export function DevolvidosManager() {
 
   const cancelEdit = () => {
     setEditingId(null);
+    setMode("devolvido");
     setForm(emptyForm());
   };
 
@@ -180,31 +212,34 @@ export function DevolvidosManager() {
       toast.error("Informe valores válidos");
       return;
     }
-    if (
-      form.valor_devolvido < 0 ||
-      form.valor_rec_fornecedor < 0 ||
-      form.valor_rec_empresa < 0
-    ) {
+    if (form.valor_devolvido < 0 || form.valor_rec_fornecedor < 0 || form.valor_rec_empresa < 0) {
       toast.error("Os valores não podem ser negativos");
       return;
     }
-    const totalRecuperado = form.valor_rec_fornecedor + form.valor_rec_empresa;
-    if (totalRecuperado > form.valor_devolvido) {
+    const normalizedForm = {
+      ...form,
+      valor_rec_fornecedor: 0,
+      valor_rec_empresa: rowRecovered(form),
+    };
+    const payload =
+      mode === "recuperacao" ? { ...normalizedForm, valor_devolvido: 0 } : normalizedForm;
+    const totalRecuperado = payload.valor_rec_empresa;
+    if (mode === "devolvido" && totalRecuperado > payload.valor_devolvido) {
       toast.error("O total recuperado não pode ser maior que o valor devolvido");
       return;
     }
-    const noValues =
-      form.valor_devolvido <= 0 &&
-      form.valor_rec_fornecedor <= 0 &&
-      form.valor_rec_empresa <= 0;
-    if (noValues && !editingId) {
-      toast.error("Informe ao menos um valor");
+    if (mode === "devolvido" && payload.valor_devolvido <= 0 && !editingId) {
+      toast.error("Informe o valor devolvido");
+      return;
+    }
+    if (mode === "recuperacao" && totalRecuperado <= 0) {
+      toast.error("Informe o valor recuperado");
       return;
     }
     if (editingId) {
-      updateMut.mutate({ ...form, id: editingId });
+      updateMut.mutate({ ...payload, id: editingId });
     } else {
-      insertMut.mutate(form);
+      insertMut.mutate(payload);
     }
   };
 
@@ -219,11 +254,20 @@ export function DevolvidosManager() {
   );
 
   const totals = useMemo(() => {
-    const voltou = monthRows.reduce((s, r) => s + Number(r.valor_devolvido || 0), 0);
-    const recF = monthRows.reduce((s, r) => s + Number(r.valor_rec_fornecedor || 0), 0);
-    const recE = monthRows.reduce((s, r) => s + Number(r.valor_rec_empresa || 0), 0);
-    return { voltou, recuperado: recF + recE, pendente: voltou - recF - recE };
-  }, [monthRows]);
+    const voltouMes = monthRows.reduce((s, r) => s + Number(r.valor_devolvido || 0), 0);
+    const recFMes = monthRows.reduce((s, r) => s + Number(r.valor_rec_fornecedor || 0), 0);
+    const recEMes = monthRows.reduce((s, r) => s + Number(r.valor_rec_empresa || 0), 0);
+    const voltouTotal = rows.reduce((s, r) => s + Number(r.valor_devolvido || 0), 0);
+    const recTotal = rows.reduce(
+      (s, r) => s + Number(r.valor_rec_fornecedor || 0) + Number(r.valor_rec_empresa || 0),
+      0,
+    );
+    return {
+      voltouMes,
+      recuperadoMes: recFMes + recEMes,
+      pendenteTotal: voltouTotal - recTotal,
+    };
+  }, [monthRows, rows]);
 
   const prevRows = useMemo(
     () => rows.filter((r) => ymKey(r.data) !== currentYM),
@@ -232,7 +276,21 @@ export function DevolvidosManager() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-foreground">Cheques devolvidos</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-foreground">Cheques devolvidos</h2>
+        <button
+          type="button"
+          onClick={exportToExcel}
+          disabled={exporting || rows.length === 0}
+          title="Exportar planilha Excel com análise completa"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-40"
+        >
+          {exporting
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <FileSpreadsheet className="h-3.5 w-3.5" />}
+          {exporting ? "Gerando…" : "Exportar Excel"}
+        </button>
+      </div>
 
       {/* ── Form ─────────────────────────────────────────────────────────── */}
       <form
@@ -256,6 +314,42 @@ export function DevolvidosManager() {
           </div>
         )}
 
+        <div className="inline-flex rounded-lg border border-border bg-surface p-1 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("devolvido");
+              setForm((f) => ({ ...f, valor_devolvido: f.valor_devolvido || 0 }));
+            }}
+            className={`rounded-md px-3 py-1.5 transition-colors ${
+              mode === "devolvido"
+                ? "bg-card text-gold ring-1 ring-gold/40"
+                : "text-soft-foreground hover:text-foreground"
+            }`}
+          >
+            Cheque devolvido
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("recuperacao");
+              setForm((f) => ({
+                ...f,
+                valor_devolvido: 0,
+                valor_rec_fornecedor: 0,
+                valor_rec_empresa: rowRecovered(f),
+              }));
+            }}
+            className={`rounded-md px-3 py-1.5 transition-colors ${
+              mode === "recuperacao"
+                ? "bg-card text-blue ring-1 ring-blue/40"
+                : "text-soft-foreground hover:text-foreground"
+            }`}
+          >
+            Recuperação avulsa
+          </button>
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Data">
             <input
@@ -266,36 +360,40 @@ export function DevolvidosManager() {
               className={inputCls}
             />
           </Field>
-          <Field label="Valor devolvido (R$)">
+          {mode === "devolvido" ? (
+            <Field label="Valor devolvido (R$)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor_devolvido || ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valor_devolvido: Number(e.target.value) }))
+                }
+                className={inputCls}
+              />
+            </Field>
+          ) : (
+            <div className="rounded-lg border border-blue/30 bg-blue-dim/20 px-3 py-2">
+              <div className="text-xs font-medium uppercase tracking-wider text-blue">Tipo</div>
+              <div className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <PlusCircle className="h-4 w-4 text-blue" />
+                Recuperado sem vínculo
+              </div>
+            </div>
+          )}
+          <Field label="Valor recuperado (R$)">
             <input
               type="number"
               step="0.01"
               min="0"
-              value={form.valor_devolvido || ""}
-              onChange={(e) => setForm((f) => ({ ...f, valor_devolvido: Number(e.target.value) }))}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Recuperado — fornecedor (R$)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.valor_rec_fornecedor || ""}
+              value={rowRecovered(form) || ""}
               onChange={(e) =>
-                setForm((f) => ({ ...f, valor_rec_fornecedor: Number(e.target.value) }))
-              }
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Recuperado — empresa/Ley (R$)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.valor_rec_empresa || ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, valor_rec_empresa: Number(e.target.value) }))
+                setForm((f) => ({
+                  ...f,
+                  valor_rec_fornecedor: 0,
+                  valor_rec_empresa: Number(e.target.value),
+                }))
               }
               className={inputCls}
             />
@@ -309,19 +407,25 @@ export function DevolvidosManager() {
             className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-sm font-bold text-background hover:bg-gold/90 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
-            {isPending ? "Salvando..." : editingId ? "Salvar edição" : "Salvar"}
+            {isPending
+              ? "Salvando..."
+              : editingId
+                ? "Salvar edição"
+                : mode === "recuperacao"
+                  ? "Adicionar recuperado"
+                  : "Salvar"}
           </button>
         </div>
       </form>
 
       {/* ── KPIs deste mês ───────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <KpiBox label="Voltou este mês" value={brl(totals.voltou)} tone="text-red" />
-        <KpiBox label="Recuperado" value={brl(totals.recuperado)} tone="text-blue" />
+        <KpiBox label="Voltou este mês" value={brl(totals.voltouMes)} tone="text-red" />
+        <KpiBox label="Recuperado este mês" value={brl(totals.recuperadoMes)} tone="text-blue" />
         <KpiBox
-          label="Pendente"
-          value={totals.pendente <= 0 ? "✓ Tudo quitado" : brl(totals.pendente)}
-          tone={totals.pendente <= 0 ? "text-green" : totals.pendente >= totals.voltou ? "text-red" : "text-gold"}
+          label="Pendente geral"
+          value={totals.pendenteTotal <= 0 ? "✓ Tudo quitado" : brl(totals.pendenteTotal)}
+          tone={totals.pendenteTotal <= 0 ? "text-green" : "text-gold"}
         />
       </div>
 
@@ -355,9 +459,16 @@ export function DevolvidosManager() {
             <AlertDialogDescription>
               {deleteTarget && (
                 <>
-                  Lançamento de{" "}
-                  <strong>{fmtDateBR(deleteTarget.data)}</strong> — devolvido{" "}
-                  <strong>{brl(Number(deleteTarget.valor_devolvido))}</strong>.
+                  Lançamento de <strong>{fmtDateBR(deleteTarget.data)}</strong> —{" "}
+                  {isRecoveryOnly(deleteTarget) ? "recuperado " : "devolvido "}
+                  <strong>
+                    {brl(
+                      isRecoveryOnly(deleteTarget)
+                        ? rowRecovered(deleteTarget)
+                        : Number(deleteTarget.valor_devolvido),
+                    )}
+                  </strong>
+                  .
                   <br />
                   Esta ação não pode ser desfeita.
                 </>
@@ -410,8 +521,7 @@ function EntriesTable({
             <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3 font-medium">Data</th>
               <th className="px-4 py-3 text-right font-medium">Voltou</th>
-              <th className="px-4 py-3 text-right font-medium">Rec. Fornecedor</th>
-              <th className="px-4 py-3 text-right font-medium">Rec. Empresa</th>
+              <th className="px-4 py-3 text-right font-medium">Recuperado</th>
               <th className="px-4 py-3 text-right font-medium">Pendente</th>
               <th className="px-4 py-3 text-right font-medium">Ações</th>
             </tr>
@@ -419,11 +529,11 @@ function EntriesTable({
           <tbody>
             {rows.map((r) => {
               const devolvido = Number(r.valor_devolvido);
-              const recF = Number(r.valor_rec_fornecedor);
-              const recE = Number(r.valor_rec_empresa);
-              const pend = devolvido - recF - recE;
+              const recuperado = rowRecovered(r);
+              const pend = devolvido - recuperado;
+              const recuperacaoAvulsa = isRecoveryOnly(r);
               const quitado = pend <= 0;
-              const semRecuperacao = recF === 0 && recE === 0 && devolvido > 0;
+              const semRecuperacao = recuperado === 0 && devolvido > 0;
               const isActive = editingId === r.id;
               return (
                 <tr
@@ -437,19 +547,31 @@ function EntriesTable({
                   }`}
                 >
                   <td className="px-4 py-3 font-semibold text-foreground">
-                    {fmtDateBR(r.data)}
+                    <div>{fmtDateBR(r.data)}</div>
+                    {recuperacaoAvulsa && (
+                      <div className="mt-0.5 text-[11px] font-medium text-blue">
+                        Recuperação avulsa
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-red">
-                    {brl(devolvido)}
+                    {devolvido > 0 ? (
+                      brl(devolvido)
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right text-blue">
-                    {recF > 0 ? brl(recF) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right text-blue">
-                    {recE > 0 ? brl(recE) : <span className="text-muted-foreground">—</span>}
+                    {recuperado > 0 ? (
+                      brl(recuperado)
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-bold">
-                    {quitado ? (
+                    {recuperacaoAvulsa ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : quitado ? (
                       <span className="text-green">✓ Quitado</span>
                     ) : semRecuperacao ? (
                       <span className="text-red">{brl(pend)}</span>
@@ -482,10 +604,7 @@ function EntriesTable({
             })}
             {!isLoading && rows.length === 0 && (
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-8 text-center text-sm text-muted-foreground"
-                >
+                <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
                   Nenhum lançamento neste período.
                 </td>
               </tr>
@@ -495,6 +614,10 @@ function EntriesTable({
       </div>
     </div>
   );
+}
+
+function isRecoveryOnly(r: Row) {
+  return Number(r.valor_devolvido || 0) <= 0 && rowRecovered(r) > 0;
 }
 
 function KpiBox({ label, value, tone }: { label: string; value: string; tone: string }) {
