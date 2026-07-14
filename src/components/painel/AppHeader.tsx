@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { LogOut, Settings2, ClipboardEdit, BarChart2, Loader2 } from "lucide-react";
+import { LogOut, Settings2, ClipboardEdit, BarChart2, Loader2, Download } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
@@ -7,11 +7,32 @@ import { useStore } from "@/data/store";
 import { isEnviado } from "@/data/painel";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoles } from "@/hooks/use-role";
+import { buildPainelWorkbook } from "@/lib/excel-painel";
 
 export function AppHeader() {
   const { notas, caixa } = useStore();
   const { isAdmin, canWrite } = useRoles();
   const [sendingStatus, setSendingStatus] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    try {
+      const blob = await buildPainelWorkbook(notas, caixa);
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement("a");
+      const today = new Date().toISOString().slice(0, 10);
+      a.href     = url;
+      a.download = `Ley_Painel_${today}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Planilha exportada com sucesso");
+    } catch {
+      toast.error("Erro ao exportar planilha");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const enviarStatus = async () => {
     setSendingStatus(true);
@@ -87,6 +108,19 @@ export function AppHeader() {
                   ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   : <BarChart2 className="h-3.5 w-3.5" />}
                 Status
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={exportToExcel}
+                disabled={exporting}
+                title="Exportar dados completos em Excel"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-gold hover:border-gold/40 transition-colors disabled:opacity-50"
+              >
+                {exporting
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Download className="h-3.5 w-3.5" />}
+                Exportar
               </button>
             )}
             {isAdmin && (
