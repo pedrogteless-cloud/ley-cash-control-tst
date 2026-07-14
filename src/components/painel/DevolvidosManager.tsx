@@ -84,6 +84,9 @@ export function DevolvidosManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [showExportForm, setShowExportForm] = useState(false);
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo,   setExportTo]   = useState("");
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["cheques_devolvidos"],
@@ -115,9 +118,19 @@ export function DevolvidosManager() {
 
   // ── Excel export ────────────────────────────────────────────────────────
   const exportToExcel = async () => {
+    setShowExportForm(false);
     setExporting(true);
     try {
-      const blob = await buildDevolvidosWorkbook(rows);
+      const filtered = rows.filter((r) => {
+        if (exportFrom && r.data < exportFrom) return false;
+        if (exportTo   && r.data > exportTo)   return false;
+        return true;
+      });
+      if (filtered.length === 0) {
+        toast.error("Nenhum lançamento no período selecionado");
+        return;
+      }
+      const blob = await buildDevolvidosWorkbook(filtered, { from: exportFrom, to: exportTo });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       const today = new Date().toISOString().slice(0, 10);
@@ -280,10 +293,14 @@ export function DevolvidosManager() {
         <h2 className="text-lg font-semibold text-foreground">Cheques devolvidos</h2>
         <button
           type="button"
-          onClick={exportToExcel}
+          onClick={() => setShowExportForm((v) => !v)}
           disabled={exporting || rows.length === 0}
           title="Exportar planilha Excel com análise completa"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-40"
+          className={`inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
+            showExportForm
+              ? "border-gold/60 text-gold"
+              : "border-border text-soft-foreground hover:border-gold/40 hover:text-gold"
+          }`}
         >
           {exporting
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -291,6 +308,55 @@ export function DevolvidosManager() {
           {exporting ? "Gerando…" : "Exportar Excel"}
         </button>
       </div>
+
+      {/* ── Painel de período para exportação ─────────────────────────────── */}
+      {showExportForm && !exporting && (
+        <div className="rounded-xl border border-gold/30 bg-card p-4 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Período da análise
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1">
+              <span className="text-xs text-muted-foreground">De</span>
+              <input
+                type="date"
+                value={exportFrom}
+                onChange={(e) => setExportFrom(e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs text-muted-foreground">Até</span>
+              <input
+                type="date"
+                value={exportTo}
+                onChange={(e) => setExportTo(e.target.value)}
+                className={inputCls}
+              />
+            </label>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Deixe em branco para incluir todos os registros.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowExportForm(false)}
+              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-foreground transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={exportToExcel}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-xs font-bold text-background hover:bg-gold/90 transition-colors"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Gerar planilha
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Form ─────────────────────────────────────────────────────────── */}
       <form
