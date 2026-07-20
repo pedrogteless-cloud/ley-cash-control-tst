@@ -1,454 +1,833 @@
+// Exportação completa do Painel de Cheques — Grupo Ley
+// Paleta visual alinhada com o design do software (navy + ouro + semáforo claro).
+
 import type { NFRecord, CaixaRecord } from "@/data/store";
-import { isEnviado } from "@/data/painel";
+import { isAEnviar, isAguardando, isEnviado, isSeparado } from "@/data/painel";
 import { supabase } from "@/integrations/supabase/client";
 
-// @ts-ignore
-const ExcelJS = () => import("exceljs");
+// ── Paleta ────────────────────────────────────────────────────────────────────
+const NAVY    = "FF0D1117";
+const GOLD    = "FFF0B429";
+const RED_H   = "FF8B2000";
+const GRN_H   = "FF1A5E35";
+const TEL_H   = "FF0D4A5F";
+const AMB_H   = "FF6B4200";
+const BLU_H   = "FF0D3250";
+const WHITE   = "FFFFFFFF";
+const GOLD_LT = "FFFFF9EE";
+const BORD    = "FFD4B483";
+const INK     = "FF0D1117";
+const RED_T   = "FF8B1A1A";
+const GRN_T   = "FF1A5E35";
+const AMB_T   = "FF8B5A00";
+const BLU_T   = "FF0D3B73";
+const GRAY_T  = "FF5A5A6E";
 
-// ── Palette ──────────────────────────────────────────────────────────────────
-const BG    = "1E1E2E";
-const CARD  = "252540";
-const HDR   = "2A2A4A";
-const ALT   = "22223A";
-const GOLD  = "C9A84C";
-const WHITE = "F0F0FF";
-const GRAY  = "8080A0";
-const GREEN = "388E3C";
-const RED   = "C62828";
-const AMBER = "E65100";
-const TEAL  = "00796B";
-const BLUE  = "1565C0";
-
+// ── Formatos numéricos ────────────────────────────────────────────────────────
 const BRL  = '"R$" #,##0.00';
 const PCT  = "0.0%";
-const DATE = "DD/MM/YYYY";
+const INT  = "#,##0";
+const DELT = '+#,##0.00;-#,##0.00;"-"';
 
-type Cell = {
-  value: string | number | null;
-  fmt?: string;
-  bold?: boolean;
-  color?: string;
-  bg?: string;
-  align?: "left" | "center" | "right";
-  italic?: boolean;
-};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AC = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AW = any;
 
-function applyCell(wsCell: any, c: Cell) {
-  wsCell.value = c.value;
-  if (c.fmt) wsCell.numFmt = c.fmt;
-  wsCell.font = {
-    name: "Arial",
-    size: 10,
-    bold: c.bold ?? false,
-    color: { argb: "FF" + (c.color ?? WHITE) },
-    italic: c.italic ?? false,
-  };
-  wsCell.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF" + (c.bg ?? BG) },
-  };
-  wsCell.alignment = {
-    horizontal: c.align ?? "center",
-    vertical: "middle",
-    wrapText: false,
-  };
-  const border = { style: "thin" as const, color: { argb: "FF3A3A5A" } };
-  wsCell.border = { top: border, bottom: border, left: border, right: border };
+// ── Helpers visuais ───────────────────────────────────────────────────────────
+function fill(argb: string) {
+  return { type: "pattern", pattern: "solid", fgColor: { argb } } as const;
+}
+function brd() {
+  const t = (a: string) => ({ style: "thin", color: { argb: a } } as const);
+  return { top: t(BORD), left: t(BORD), bottom: t(BORD), right: t(BORD) };
 }
 
-function title(ws: any, text: string, cols: number) {
-  ws.mergeCells(1, 1, 1, cols);
-  const cell = ws.getCell(1, 1);
+function hdr(cell: AC, text: string, bg: string, align: "left" | "center" | "right" = "center") {
   cell.value = text;
-  cell.font  = { name: "Arial", size: 16, bold: true, color: { argb: "FF" + GOLD } };
-  cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + BG } };
-  cell.alignment = { horizontal: "left", vertical: "middle" };
-  ws.getRow(1).height = 34;
-  for (let c = 2; c <= cols; c++) {
-    const bg = ws.getCell(1, c);
-    bg.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + BG } };
-  }
+  cell.font  = { bold: true, size: 9, color: { argb: WHITE }, name: "Arial" };
+  cell.fill  = fill(bg);
+  cell.alignment = { vertical: "middle", horizontal: align, wrapText: true };
+  cell.border = brd();
 }
 
-function hdrRow(ws: any, row: number, labels: string[], cols?: number[]) {
-  ws.getRow(row).height = 22;
-  labels.forEach((label, i) => {
-    const c: Cell = { value: label, bold: true, color: GOLD, bg: HDR, align: "center" };
-    applyCell(ws.getCell(row, i + 1), c);
-  });
+function dat(
+  cell: AC, value: unknown, numFmt: string | undefined,
+  textColor: string, bgColor: string, align: "left" | "center" | "right",
+  bold = false,
+) {
+  cell.value = value ?? null;
+  if (numFmt) cell.numFmt = numFmt;
+  cell.font      = { size: 9, bold, color: { argb: textColor }, name: "Arial" };
+  cell.fill      = fill(bgColor);
+  cell.alignment = { vertical: "middle", horizontal: align, indent: align === "left" ? 1 : 0 };
+  cell.border    = brd();
 }
 
-function floodBg(ws: any, maxRow: number, maxCol: number) {
-  for (let r = 1; r <= maxRow; r++) {
-    for (let c = 1; c <= maxCol; c++) {
-      const cell = ws.getCell(r, c);
-      if (!cell.fill || !cell.fill.fgColor) {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + BG } };
-      }
-    }
-  }
+function tot(cell: AC, value: unknown, numFmt: string | undefined, align: "left" | "center" | "right" = "right") {
+  cell.value = value ?? null;
+  if (numFmt) cell.numFmt = numFmt;
+  cell.font      = { bold: true, size: 9, color: { argb: WHITE }, name: "Arial" };
+  cell.fill      = fill(NAVY);
+  cell.alignment = { vertical: "middle", horizontal: align, indent: align === "left" ? 1 : 0 };
+  cell.border    = brd();
 }
 
-function fmt_date(iso: string | undefined | null): string {
+function emptyNav(cell: AC) {
+  cell.fill   = fill(NAVY);
+  cell.border = brd();
+}
+
+function zebra(i: number): string { return i % 2 === 0 ? GOLD_LT : WHITE; }
+
+function fmtDateISO(iso?: string | null): string {
   if (!iso) return "—";
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  try {
+    const d = new Date(iso);
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  } catch { return "—"; }
 }
 
-function statusColor(status: string): string {
-  const s = status.toUpperCase();
-  if (s.includes("ENVIADO")) return GREEN;
-  if (s.includes("CHEGOU")) return TEAL;
-  if (s.includes("NÃO") || s.includes("NAO")) return AMBER;
-  return GRAY;
+function fmtMonthBR(ym: string): string {
+  const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  const [y, m] = ym.split("-");
+  return `${meses[Number(m) - 1]}/${y}`;
 }
 
-// ─── Sheet 1: Notas Fiscais ───────────────────────────────────────────────────
-function buildNotasSheet(wb: any, notas: NFRecord[]) {
-  const ws = wb.addWorksheet("📋 Notas Fiscais");
-  ws.views = [{ showGridLines: false }];
-
-  const COLS = [
-    { header: "Data Cadastro", width: 16 },
-    { header: "NF",            width: 14 },
-    { header: "Fornecedor",    width: 28 },
-    { header: "Filial",        width: 16 },
-    { header: "Valor",         width: 16 },
-    { header: "Status NF",     width: 18 },
-    { header: "Entrega",       width: 22 },
-    { header: "Status Envio",  width: 16 },
-    { header: "Data Envio",    width: 16 },
+// ══════════════════════════════════════════════════════════════════════════════
+//  ABA 1 — Resumo Executivo
+// ══════════════════════════════════════════════════════════════════════════════
+function buildResumoSheet(
+  wb: AW,
+  notas: NFRecord[],
+  caixa: CaixaRecord[],
+  devolvidos: DevRow[],
+  todayBR: string,
+) {
+  const ws: AW = wb.addWorksheet("Resumo Executivo", { views: [{ showGridLines: false }] });
+  ws.columns = [
+    { width: 40 }, // A
+    { width: 20 }, // B
+    { width: 16 }, // C
+    { width: 16 }, // D
+    { width: 16 }, // E
+    { width: 16 }, // F
   ];
-  COLS.forEach((col, i) => { ws.getColumn(i + 1).width = col.width; });
 
-  // bg flood (approximate)
-  for (let r = 1; r <= notas.length + 5; r++) {
-    ws.getRow(r).height = r === 1 ? 34 : r === 2 ? 8 : 20;
-    for (let c = 1; c <= COLS.length; c++) {
-      ws.getCell(r, c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + BG } };
-    }
-  }
+  // ── Cabeçalho ──────────────────────────────────────────────────────────────
+  ws.mergeCells("A1:F1");
+  const t = ws.getCell("A1");
+  t.value = "PAINEL DE CHEQUES — GRUPO LEY";
+  t.font  = { bold: true, size: 18, color: { argb: GOLD }, name: "Arial" };
+  t.fill  = fill(NAVY);
+  t.alignment = { vertical: "middle", horizontal: "center" };
+  ws.getRow(1).height = 38;
 
-  title(ws, `NOTAS FISCAIS — Grupo Ley  (${notas.length} registros)`, COLS.length);
-  ws.getRow(2).height = 8;
-  hdrRow(ws, 3, COLS.map((c) => c.header));
+  ws.mergeCells("A2:F2");
+  const sub = ws.getCell("A2");
+  sub.value = `Gerado em ${todayBR}  ·  ${notas.length} NFs  ·  ${caixa.length} movimentos de caixa  ·  ${devolvidos.length} devolvidos`;
+  sub.font  = { size: 9, italic: true, color: { argb: "FF8B949E" }, name: "Arial" };
+  sub.fill  = fill(NAVY);
+  sub.alignment = { vertical: "middle", horizontal: "center" };
+  ws.getRow(2).height = 16;
+  ws.getRow(3).height = 10;
 
-  notas.forEach((n, i) => {
-    const r = i + 4;
-    ws.getRow(r).height = 20;
-    const bg = i % 2 === 0 ? CARD : ALT;
-    const enviado = isEnviado(n);
-    const row: Cell[] = [
-      { value: fmt_date(n.createdAt),                    bg, color: GRAY },
-      { value: n.nf,                                     bg, color: WHITE, align: "left" },
-      { value: n.fornecedor,                             bg, color: WHITE, align: "left" },
-      { value: n.filial,                                 bg, color: GRAY },
-      { value: n.valor, fmt: BRL,                        bg, color: WHITE },
-      { value: n.statusNf,                               bg, color: statusColor(n.statusNf) },
-      { value: n.entrega,                                bg, color: GRAY, align: "left" },
-      { value: enviado ? "ENVIADO" : "—",                bg, color: enviado ? GREEN : GRAY, bold: enviado },
-      { value: fmt_date(n.chequeEnviadoEm),              bg, color: enviado ? WHITE : GRAY },
-    ];
-    row.forEach((c, ci) => applyCell(ws.getCell(r, ci + 1), c));
+  // ── KPIs derivados ─────────────────────────────────────────────────────────
+  const emAberto    = notas.filter((n) => !isEnviado(n));
+  const emCarteira  = notas.filter(isAEnviar);
+  const separados   = notas.filter(isSeparado);
+  const aguardando  = notas.filter(isAguardando);
+  const enviadas    = notas.filter(isEnviado);
+
+  const valCarteira   = emCarteira.reduce((s, n) => s + n.valor, 0);
+  const valSeparados  = separados.reduce((s, n) => s + n.valor, 0);
+  const valAguardando = aguardando.reduce((s, n) => s + n.valor, 0);
+  const valEnviado    = enviadas.reduce((s, n) => s + n.valor, 0);
+  const valAberto     = emAberto.reduce((s, n) => s + n.valor, 0);
+
+  const saldoAtual = caixa.length ? caixa[caixa.length - 1].saldoTotal : 0;
+  const cobertura  = valAberto > 0 ? saldoAtual / valAberto : null;
+
+  const totDevolvido  = devolvidos.reduce((s, r) => s + Number(r.valor_devolvido || 0), 0);
+  const totRecuperado = devolvidos.reduce((s, r) => s + Number(r.valor_rec_fornecedor || 0) + Number(r.valor_rec_empresa || 0), 0);
+  const totPendDev    = totDevolvido - totRecuperado;
+  const taxaRecDev    = totDevolvido > 0 ? totRecuperado / totDevolvido : null;
+
+  const totalEntradas = caixa.reduce((s, c) => s + c.entrada, 0);
+  const totalSaidas   = caixa.reduce((s, c) => s + c.saida, 0);
+
+  // Fornecedor com maior valor em aberto
+  const fornMap = new Map<string, number>();
+  emCarteira.forEach((n) => fornMap.set(n.fornecedor, (fornMap.get(n.fornecedor) || 0) + n.valor));
+  const maiorForn = [...fornMap.entries()].sort((a, b) => b[1] - a[1])[0];
+
+  // ── Seção A: Posição Atual ─────────────────────────────────────────────────
+  const A_ROW = 4;
+  ws.mergeCells(A_ROW, 1, A_ROW, 6);
+  hdr(ws.getCell(A_ROW, 1), "📊  POSIÇÃO ATUAL — CARTEIRA E CAIXA", GOLD, "left");
+  ws.getRow(A_ROW).height = 22;
+
+  type KpiEntry = [string, unknown, string | undefined, string, boolean?];
+  const kpisA: KpiEntry[] = [
+    ["Carteira de NFs em aberto (total)", valAberto,    BRL, INK, true],
+    ["  ↳ Em carteira (prontas p/ cheque)", valCarteira, BRL, AMB_T],
+    ["  ↳ Separadas para envio",            valSeparados, BRL, BLU_T],
+    ["  ↳ Aguardando chegada de carga",      valAguardando,BRL, GRAY_T],
+    ["Saldo em caixa de cheques",           saldoAtual,  BRL, GRN_T, true],
+    [
+      "Cobertura do caixa sobre a carteira",
+      cobertura,
+      PCT,
+      cobertura === null ? GRAY_T : cobertura >= 1 ? GRN_T : cobertura >= 0.7 ? AMB_T : RED_T,
+      true,
+    ],
+    ["Qtd. NFs em aberto", emAberto.length, INT, INK],
+    ["Qtd. NFs prontas p/ cheque", emCarteira.length, INT, emCarteira.length > 0 ? AMB_T : GRN_T],
+    ["Qtd. NFs já enviadas (histórico)", enviadas.length, INT, GRN_T],
+    ["Total já enviado em cheques", valEnviado, BRL, GRN_T],
+  ];
+
+  kpisA.forEach(([label, value, fmt, color, bold], i) => {
+    const ri = A_ROW + 1 + i;
+    const bg = zebra(i);
+    ws.getRow(ri).height = 17;
+
+    const la = ws.getCell(ri, 1);
+    la.value = label;
+    la.font  = { size: 9, color: { argb: INK }, name: "Arial", bold: !!bold, italic: (label as string).startsWith("  ") };
+    la.fill  = fill(bg);
+    la.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+    la.border = brd();
+
+    const va = ws.getCell(ri, 2);
+    va.value = value;
+    if (fmt) va.numFmt = fmt;
+    va.font  = { size: 10, bold: !!bold, color: { argb: color }, name: "Arial" };
+    va.fill  = fill(bg);
+    va.alignment = { vertical: "middle", horizontal: "right" };
+    va.border = brd();
+    ws.mergeCells(ri, 2, ri, 6);
   });
 
-  // total row
-  const tr = notas.length + 4;
-  ws.getRow(tr).height = 26;
-  const totalVal = notas.reduce((s, n) => s + n.valor, 0);
-  const totalEnv = notas.filter(isEnviado).reduce((s, n) => s + n.valor, 0);
-  const totals: Cell[] = [
-    { value: "TOTAL",                             bg: HDR, color: GOLD, bold: true },
-    { value: `${notas.length} NFs`,               bg: HDR, color: GRAY },
-    { value: "",                                  bg: HDR, color: WHITE },
-    { value: "",                                  bg: HDR, color: WHITE },
-    { value: totalVal, fmt: BRL,                  bg: HDR, color: GOLD, bold: true },
-    { value: "",                                  bg: HDR, color: WHITE },
-    { value: "",                                  bg: HDR, color: WHITE },
-    { value: `${notas.filter(isEnviado).length} enviadas`, bg: HDR, color: GREEN },
-    { value: `R$ ${totalEnv.toLocaleString("pt-BR",{minimumFractionDigits:2})} enviado`, bg: HDR, color: GREEN },
+  // ── Seção B: Caixa ─────────────────────────────────────────────────────────
+  const B_ROW = A_ROW + kpisA.length + 2;
+  ws.getRow(B_ROW - 1).height = 8;
+  ws.mergeCells(B_ROW, 1, B_ROW, 6);
+  hdr(ws.getCell(B_ROW, 1), "💰  MOVIMENTOS DE CAIXA — RESUMO", NAVY, "left");
+  ws.getRow(B_ROW).height = 22;
+
+  const kpisB: KpiEntry[] = [
+    ["Total de entradas no histórico", totalEntradas, BRL, GRN_T, true],
+    ["Total de saídas no histórico", totalSaidas, BRL, RED_T, true],
+    ["Resultado líquido (entradas − saídas)", totalEntradas - totalSaidas, DELT, (totalEntradas - totalSaidas) >= 0 ? GRN_T : RED_T, true],
+    ["Qtd. movimentos cadastrados", caixa.length, INT, INK],
+    ["Último movimento", caixa.length ? `${caixa[caixa.length - 1].data} — ${caixa[caixa.length - 1].destino ?? "Sem destino"}` : "—", undefined, GRAY_T],
   ];
-  totals.forEach((c, ci) => applyCell(ws.getCell(tr, ci + 1), c));
-}
 
-// ─── Sheet 2: Histórico de Envios ────────────────────────────────────────────
-function buildEnviosSheet(wb: any, notas: NFRecord[]) {
-  const enviadas = notas
-    .filter(isEnviado)
-    .sort((a, b) => (a.chequeEnviadoEm ?? "").localeCompare(b.chequeEnviadoEm ?? ""));
+  kpisB.forEach(([label, value, fmt, color, bold], i) => {
+    const ri = B_ROW + 1 + i;
+    const bg = zebra(i);
+    ws.getRow(ri).height = 17;
 
-  const ws = wb.addWorksheet("🚚 Envios");
-  ws.views = [{ showGridLines: false }];
+    const la = ws.getCell(ri, 1);
+    la.value = label;
+    la.font  = { size: 9, color: { argb: INK }, name: "Arial", bold: !!bold };
+    la.fill  = fill(bg);
+    la.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+    la.border = brd();
 
-  const COLS = [
-    { header: "Data Envio",  width: 16 },
-    { header: "Fornecedor",  width: 28 },
-    { header: "NF",          width: 14 },
-    { header: "Filial",      width: 16 },
-    { header: "Valor",       width: 16 },
-    { header: "Status NF",   width: 20 },
-  ];
-  COLS.forEach((col, i) => { ws.getColumn(i + 1).width = col.width; });
-
-  for (let r = 1; r <= enviadas.length + 5; r++) {
-    ws.getRow(r).height = r === 1 ? 34 : r === 2 ? 8 : 20;
-    for (let c = 1; c <= COLS.length; c++) {
-      ws.getCell(r, c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + BG } };
-    }
-  }
-
-  title(ws, `HISTÓRICO DE ENVIOS DE CHEQUE — ${enviadas.length} NFs enviadas`, COLS.length);
-  ws.getRow(2).height = 8;
-  hdrRow(ws, 3, COLS.map((c) => c.header));
-
-  enviadas.forEach((n, i) => {
-    const r = i + 4;
-    ws.getRow(r).height = 20;
-    const bg = i % 2 === 0 ? CARD : ALT;
-    const row: Cell[] = [
-      { value: fmt_date(n.chequeEnviadoEm), bg, color: WHITE, bold: true },
-      { value: n.fornecedor,                bg, color: WHITE, align: "left" },
-      { value: n.nf,                        bg, color: GRAY, align: "left" },
-      { value: n.filial,                    bg, color: GRAY },
-      { value: n.valor, fmt: BRL,           bg, color: GREEN },
-      { value: n.statusNf,                  bg, color: statusColor(n.statusNf), align: "left" },
-    ];
-    row.forEach((c, ci) => applyCell(ws.getCell(r, ci + 1), c));
+    const va = ws.getCell(ri, 2);
+    va.value = value;
+    if (fmt) va.numFmt = fmt;
+    va.font  = { size: 10, bold: !!bold, color: { argb: color }, name: "Arial" };
+    va.fill  = fill(bg);
+    va.alignment = { vertical: "middle", horizontal: "right" };
+    va.border = brd();
+    ws.mergeCells(ri, 2, ri, 6);
   });
 
-  const tr = enviadas.length + 4;
-  ws.getRow(tr).height = 26;
-  const tv = enviadas.reduce((s, n) => s + n.valor, 0);
-  const totals: Cell[] = [
-    { value: "TOTAL",                       bg: HDR, color: GOLD, bold: true },
-    { value: `${enviadas.length} NFs`,      bg: HDR, color: GRAY },
-    { value: "",                            bg: HDR, color: WHITE },
-    { value: "",                            bg: HDR, color: WHITE },
-    { value: tv, fmt: BRL,                  bg: HDR, color: GREEN, bold: true },
-    { value: "",                            bg: HDR, color: WHITE },
+  // ── Seção C: Devolvidos ────────────────────────────────────────────────────
+  const C_ROW = B_ROW + kpisB.length + 2;
+  ws.getRow(C_ROW - 1).height = 8;
+  ws.mergeCells(C_ROW, 1, C_ROW, 6);
+  hdr(ws.getCell(C_ROW, 1), "↩️  CHEQUES DEVOLVIDOS — VISÃO GERAL", RED_H, "left");
+  ws.getRow(C_ROW).height = 22;
+
+  const pendDev = devolvidos.filter((r) => {
+    const d = Number(r.valor_devolvido || 0);
+    const rec = Number(r.valor_rec_fornecedor || 0) + Number(r.valor_rec_empresa || 0);
+    return d > 0 && d - rec > 0;
+  });
+
+  const kpisC: KpiEntry[] = [
+    ["Total de cheques devolvidos (acumulado)", totDevolvido, BRL, RED_T, true],
+    ["Total recuperado", totRecuperado, BRL, GRN_T, true],
+    ["Pendente de recuperação", totPendDev, BRL, totPendDev > 0 ? AMB_T : GRN_T, true],
+    ["Taxa de recuperação global", taxaRecDev, PCT, taxaRecDev === null ? GRAY_T : taxaRecDev >= 1 ? GRN_T : taxaRecDev >= 0.5 ? AMB_T : RED_T],
+    ["Lançamentos com pendência em aberto", pendDev.length, INT, pendDev.length > 0 ? RED_T : GRN_T],
+    ["Exposição total (devolvidos ainda pendentes)", totPendDev > 0 ? totPendDev : "✓ Zerado", BRL, totPendDev > 0 ? RED_T : GRN_T],
   ];
-  totals.forEach((c, ci) => applyCell(ws.getCell(tr, ci + 1), c));
-}
 
-// ─── Sheet 3: Por Fornecedor ─────────────────────────────────────────────────
-function buildFornecedorSheet(wb: any, notas: NFRecord[]) {
-  const ws = wb.addWorksheet("👥 Por Fornecedor");
-  ws.views = [{ showGridLines: false }];
+  kpisC.forEach(([label, value, fmt, color, bold], i) => {
+    const ri = C_ROW + 1 + i;
+    const bg = zebra(i);
+    ws.getRow(ri).height = 17;
 
-  // aggregate
-  const map: Record<string, { total: number; enviado: number; carteira: number; qtdTotal: number; qtdEnviado: number }> = {};
-  for (const n of notas) {
-    if (!map[n.fornecedor]) map[n.fornecedor] = { total: 0, enviado: 0, carteira: 0, qtdTotal: 0, qtdEnviado: 0 };
-    map[n.fornecedor].total += n.valor;
-    map[n.fornecedor].qtdTotal += 1;
-    if (isEnviado(n)) {
-      map[n.fornecedor].enviado += n.valor;
-      map[n.fornecedor].qtdEnviado += 1;
+    const la = ws.getCell(ri, 1);
+    la.value = label;
+    la.font  = { size: 9, color: { argb: INK }, name: "Arial", bold: !!bold };
+    la.fill  = fill(bg);
+    la.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+    la.border = brd();
+
+    const va = ws.getCell(ri, 2);
+    va.value = value;
+    if (typeof value === "number" && fmt) va.numFmt = fmt;
+    va.font  = { size: 10, bold: !!bold, color: { argb: color }, name: "Arial" };
+    va.fill  = fill(bg);
+    va.alignment = { vertical: "middle", horizontal: "right" };
+    va.border = brd();
+    ws.mergeCells(ri, 2, ri, 6);
+  });
+
+  // ── Seção D: Insights automáticos ─────────────────────────────────────────
+  const D_ROW = C_ROW + kpisC.length + 2;
+  ws.getRow(D_ROW - 1).height = 8;
+  ws.mergeCells(D_ROW, 1, D_ROW, 6);
+  hdr(ws.getCell(D_ROW, 1), "💡  ALERTAS E INSIGHTS AUTOMÁTICOS", TEL_H, "left");
+  ws.getRow(D_ROW).height = 22;
+
+  type InsightRow = [string, string, string]; // [label, valor/destaque, cor do texto]
+  const insights: InsightRow[] = [];
+
+  // Cobertura
+  if (cobertura !== null) {
+    if (cobertura < 0.5) {
+      insights.push(["🔴 Caixa CRÍTICO — cobertura abaixo de 50%", `${(cobertura * 100).toFixed(1)}% de ${valAberto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em carteira`, RED_T]);
+    } else if (cobertura < 0.7) {
+      insights.push(["🟡 Caixa moderado — cobertura entre 50% e 70%", `${(cobertura * 100).toFixed(1)}%`, AMB_T]);
+    } else if (cobertura >= 1) {
+      insights.push(["✅ Caixa excelente — cobre 100% da carteira", `${(cobertura * 100).toFixed(1)}%`, GRN_T]);
     } else {
-      map[n.fornecedor].carteira += n.valor;
+      insights.push(["✔ Caixa saudável — cobertura acima de 70%", `${(cobertura * 100).toFixed(1)}%`, GRN_T]);
     }
   }
-  const rows = Object.entries(map).sort((a, b) => b[1].total - a[1].total);
 
-  const COLS = [
-    { header: "Fornecedor",          width: 28 },
-    { header: "Total Cadastrado",    width: 18 },
-    { header: "Total Enviado",       width: 18 },
-    { header: "Em Carteira",         width: 18 },
-    { header: "% Enviado",           width: 14 },
-    { header: "Lançamentos",         width: 14 },
-    { header: "Enviados",            width: 12 },
+  // NFs prontas não separadas
+  if (emCarteira.length > 0) {
+    insights.push([`⚠ ${emCarteira.length} NF(s) em carteira aguardando separação`, valCarteira.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), AMB_T]);
+  }
+
+  // Fornecedor com maior valor
+  if (maiorForn) {
+    insights.push([`Maior fornecedor em carteira: ${maiorForn[0]}`, maiorForn[1].toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), BLU_T]);
+  }
+
+  // Devolvidos pendentes
+  if (totPendDev > 0) {
+    insights.push([`↩ Devolvidos: ${pendDev.length} lançamento(s) com recuperação pendente`, totPendDev.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), RED_T]);
+  } else if (devolvidos.length > 0) {
+    insights.push(["✅ Devolvidos: todos os lançamentos estão quitados", "—", GRN_T]);
+  }
+
+  // Aguardando carga
+  if (aguardando.length > 0) {
+    insights.push([`⏳ ${aguardando.length} NF(s) aguardando chegada de carga`, valAguardando.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), GRAY_T]);
+  }
+
+  // Taxa de recuperação de devolvidos
+  if (taxaRecDev !== null && totDevolvido > 0) {
+    const nivel = taxaRecDev >= 1 ? "Excelente" : taxaRecDev >= 0.7 ? "Boa" : taxaRecDev >= 0.4 ? "Regular" : "Baixa";
+    insights.push([`Taxa de recuperação de devolvidos — ${nivel}`, `${(taxaRecDev * 100).toFixed(1)}% recuperado`, taxaRecDev >= 0.7 ? GRN_T : taxaRecDev >= 0.4 ? AMB_T : RED_T]);
+  }
+
+  if (insights.length === 0) insights.push(["✅ Tudo no ritmo esperado. Nenhuma pendência crítica.", "—", GRN_T]);
+
+  insights.forEach(([label, valor, color], i) => {
+    const ri = D_ROW + 1 + i;
+    const bg = zebra(i);
+    ws.getRow(ri).height = 18;
+
+    dat(ws.getCell(ri, 1), label, undefined, color, bg, "left", true);
+    ws.mergeCells(ri, 2, ri, 4);
+    dat(ws.getCell(ri, 2), valor, undefined, INK, bg, "right");
+    ws.mergeCells(ri, 5, ri, 6);
+    dat(ws.getCell(ri, 5), "", undefined, INK, bg, "right");
+  });
+
+  ws.views = [{ state: "frozen", ySplit: 2, showGridLines: false }];
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ABA 2 — Carteira de NFs (detalhado)
+// ══════════════════════════════════════════════════════════════════════════════
+function buildCarteiraNFsSheet(wb: AW, notas: NFRecord[]) {
+  const ws: AW = wb.addWorksheet("Carteira NFs", { views: [{ state: "frozen", ySplit: 2, showGridLines: false }] });
+  ws.columns = [
+    { width: 28 }, // Fornecedor
+    { width: 16 }, // NF
+    { width: 16 }, // Filial
+    { width: 16 }, // Valor
+    { width: 22 }, // Entrega / Situação
+    { width: 18 }, // Status
+    { width: 18 }, // Data Cadastro
+    { width: 18 }, // Data Envio
   ];
-  COLS.forEach((col, i) => { ws.getColumn(i + 1).width = col.width; });
 
-  for (let r = 1; r <= rows.length + 5; r++) {
-    ws.getRow(r).height = r === 1 ? 34 : r === 2 ? 8 : 22;
-    for (let c = 1; c <= COLS.length; c++) {
-      ws.getCell(r, c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + BG } };
-    }
+  ws.mergeCells("A1:H1");
+  const t = ws.getCell("A1");
+  t.value = `CARTEIRA DE NOTAS FISCAIS — ${notas.length} registros`;
+  t.font  = { bold: true, size: 13, color: { argb: GOLD }, name: "Arial" };
+  t.fill  = fill(NAVY);
+  t.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(1).height = 26;
+
+  ([
+    ["Fornecedor",     NAVY],
+    ["NF",             NAVY],
+    ["Filial",         NAVY],
+    ["Valor",          RED_H],
+    ["Entrega / Situação", AMB_H],
+    ["Status",         TEL_H],
+    ["Data Cadastro",  NAVY],
+    ["Data Envio",     GRN_H],
+  ] as [string, string][]).forEach(([h, bg], ci) => hdr(ws.getCell(2, ci + 1), h, bg));
+  ws.getRow(2).height = 20;
+
+  // Sort: primeiro os em aberto (por fornecedor), depois os enviados
+  const sorted = [...notas].sort((a, b) => {
+    const ae = isEnviado(a), be = isEnviado(b);
+    if (ae !== be) return ae ? 1 : -1; // enviados por último
+    return a.fornecedor.localeCompare(b.fornecedor);
+  });
+
+  sorted.forEach((n, i) => {
+    const ri  = 3 + i;
+    const bg  = zebra(i);
+    ws.getRow(ri).height = 17;
+
+    const enviado    = isEnviado(n);
+    const separado   = isSeparado(n);
+    const aguardando = isAguardando(n);
+    const emCrt      = isAEnviar(n);
+
+    const status = enviado ? "✓ Enviado"
+                 : separado ? "Separado p/ Envio"
+                 : emCrt    ? "Em Carteira"
+                            : "Aguard. Carga";
+    const statusC = enviado ? GRN_T
+                 : separado ? BLU_T
+                 : emCrt    ? AMB_T
+                            : GRAY_T;
+
+    dat(ws.getCell(ri, 1), n.fornecedor,                  undefined, INK,     bg, "left", true);
+    dat(ws.getCell(ri, 2), n.nf,                          undefined, INK,     bg, "left");
+    dat(ws.getCell(ri, 3), n.filial,                      undefined, GRAY_T,  bg, "left");
+    dat(ws.getCell(ri, 4), n.valor,                       BRL,       enviado ? GRN_T : RED_T, bg, "right", true);
+    dat(ws.getCell(ri, 5), n.entrega,                     undefined, GRAY_T,  bg, "left");
+    dat(ws.getCell(ri, 6), status,                        undefined, statusC, bg, "center", !!enviado);
+    dat(ws.getCell(ri, 7), fmtDateISO(n.createdAt),       undefined, GRAY_T,  bg, "center");
+    dat(ws.getCell(ri, 8), fmtDateISO(n.chequeEnviadoEm), undefined, enviado ? GRN_T : GRAY_T, bg, "center");
+  });
+
+  // Totais por status
+  const totRow = 3 + sorted.length;
+  ws.getRow(totRow).height = 20;
+  const tAberto  = notas.filter((n) => !isEnviado(n)).reduce((s, n) => s + n.valor, 0);
+  const tEnviado = notas.filter(isEnviado).reduce((s, n) => s + n.valor, 0);
+  tot(ws.getCell(totRow, 1), "TOTAL",   undefined, "left");
+  tot(ws.getCell(totRow, 2), `${notas.length} NFs`, undefined, "left");
+  emptyNav(ws.getCell(totRow, 3));
+  tot(ws.getCell(totRow, 4), tAberto + tEnviado, BRL);
+  emptyNav(ws.getCell(totRow, 5));
+  tot(ws.getCell(totRow, 6), `${notas.filter(isEnviado).length} enviadas`, undefined, "center");
+  emptyNav(ws.getCell(totRow, 7));
+  tot(ws.getCell(totRow, 8), tEnviado, BRL);
+
+  // Mini legenda abaixo
+  const legRow = totRow + 2;
+  ws.getRow(legRow).height = 14;
+  ws.mergeCells(legRow, 1, legRow, 8);
+  const leg = ws.getCell(legRow, 1);
+  leg.value = "Status: ✓ Enviado = cheque saiu  ·  Em Carteira = carga chegou, aguardando separação  ·  Aguard. Carga = mercadoria ainda não chegou";
+  leg.font  = { size: 8, italic: true, color: { argb: GRAY_T }, name: "Arial" };
+  leg.fill  = fill(WHITE);
+  leg.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ABA 3 — Por Fornecedor (análise consolidada)
+// ══════════════════════════════════════════════════════════════════════════════
+function buildFornecedorSheet(wb: AW, notas: NFRecord[]) {
+  const ws: AW = wb.addWorksheet("Por Fornecedor", { views: [{ state: "frozen", ySplit: 2, showGridLines: false }] });
+  ws.columns = [
+    { width: 28 }, // Fornecedor
+    { width: 16 }, // Em Carteira (val)
+    { width: 16 }, // Separado (val)
+    { width: 16 }, // Aguardando (val)
+    { width: 16 }, // Já Enviado (val)
+    { width: 16 }, // Total Geral (val)
+    { width: 12 }, // % Enviado
+    { width: 10 }, // Qtd NFs
+    { width: 12 }, // Qtd Enviadas
+  ];
+
+  // Aggregation
+  type FornData = {
+    emCarteira: number; separado: number; aguardando: number;
+    enviado: number; qtd: number; qtdEnv: number;
+  };
+  const map = new Map<string, FornData>();
+  for (const n of notas) {
+    const d = map.get(n.fornecedor) ?? { emCarteira: 0, separado: 0, aguardando: 0, enviado: 0, qtd: 0, qtdEnv: 0 };
+    d.qtd++;
+    if (isEnviado(n))        { d.enviado += n.valor; d.qtdEnv++; }
+    else if (isSeparado(n))  { d.separado += n.valor; }
+    else if (isAEnviar(n))   { d.emCarteira += n.valor; }
+    else                     { d.aguardando += n.valor; }
+    map.set(n.fornecedor, d);
   }
+  const rows = [...map.entries()].sort((a, b) => {
+    const totA = a[1].emCarteira + a[1].separado + a[1].aguardando;
+    const totB = b[1].emCarteira + b[1].separado + b[1].aguardando;
+    return totB - totA; // maior valor em aberto primeiro
+  });
 
-  title(ws, `RESUMO POR FORNECEDOR — ${rows.length} fornecedores`, COLS.length);
-  ws.getRow(2).height = 8;
-  hdrRow(ws, 3, COLS.map((c) => c.header));
+  ws.mergeCells("A1:I1");
+  const t = ws.getCell("A1");
+  t.value = `ANÁLISE POR FORNECEDOR — ${rows.length} fornecedores`;
+  t.font  = { bold: true, size: 13, color: { argb: GOLD }, name: "Arial" };
+  t.fill  = fill(NAVY);
+  t.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(1).height = 26;
+
+  ([
+    ["Fornecedor",   NAVY],
+    ["Em Carteira",  AMB_H],
+    ["Separado",     BLU_H],
+    ["Aguard. Carga",NAVY],
+    ["Já Enviado",   GRN_H],
+    ["Total Geral",  RED_H],
+    ["% Enviado",    TEL_H],
+    ["Qtd NFs",      NAVY],
+    ["Qtd Env.",     GRN_H],
+  ] as [string, string][]).forEach(([h, bg], ci) => hdr(ws.getCell(2, ci + 1), h, bg));
+  ws.getRow(2).height = 20;
 
   rows.forEach(([forn, d], i) => {
-    const r = i + 4;
-    ws.getRow(r).height = 22;
-    const bg = i % 2 === 0 ? CARD : ALT;
-    const pct = d.total > 0 ? d.enviado / d.total : 0;
-    const row: Cell[] = [
-      { value: forn,              bg, color: WHITE, align: "left", bold: true },
-      { value: d.total,     fmt: BRL, bg, color: WHITE },
-      { value: d.enviado,   fmt: BRL, bg, color: d.enviado > 0 ? GREEN : GRAY },
-      { value: d.carteira,  fmt: BRL, bg, color: d.carteira > 0 ? AMBER : GRAY },
-      { value: pct,         fmt: PCT, bg, color: pct >= 0.8 ? GREEN : (pct >= 0.5 ? AMBER : RED), bold: true },
-      { value: d.qtdTotal,          bg, color: GRAY },
-      { value: d.qtdEnviado,        bg, color: d.qtdEnviado > 0 ? GREEN : GRAY },
-    ];
-    row.forEach((c, ci) => applyCell(ws.getCell(r, ci + 1), c));
+    const ri  = 3 + i;
+    const bg  = zebra(i);
+    ws.getRow(ri).height = 17;
+    const total = d.emCarteira + d.separado + d.aguardando + d.enviado;
+    const pct   = total > 0 ? d.enviado / total : 0;
+    const aberto = d.emCarteira + d.separado + d.aguardando;
+
+    dat(ws.getCell(ri, 1), forn,                   undefined, INK,     bg, "left", true);
+    dat(ws.getCell(ri, 2), d.emCarteira || null,    BRL,       AMB_T,   bg, "right");
+    dat(ws.getCell(ri, 3), d.separado   || null,    BRL,       BLU_T,   bg, "right");
+    dat(ws.getCell(ri, 4), d.aguardando || null,    BRL,       GRAY_T,  bg, "right");
+    dat(ws.getCell(ri, 5), d.enviado    || null,    BRL,       GRN_T,   bg, "right");
+    dat(ws.getCell(ri, 6), total,                   BRL,       aberto > 0 ? RED_T : GRN_T, bg, "right", true);
+    dat(ws.getCell(ri, 7), pct,                     PCT,       pct >= 0.8 ? GRN_T : pct >= 0.5 ? AMB_T : RED_T, bg, "right", true);
+    dat(ws.getCell(ri, 8), d.qtd,                   INT,       INK,     bg, "right");
+    dat(ws.getCell(ri, 9), d.qtdEnv || null,        INT,       GRN_T,   bg, "right");
   });
 
-  const tr = rows.length + 4;
-  ws.getRow(tr).height = 26;
-  const ttotal = rows.reduce((s, [, d]) => s + d.total, 0);
-  const tenv   = rows.reduce((s, [, d]) => s + d.enviado, 0);
-  const tcart  = rows.reduce((s, [, d]) => s + d.carteira, 0);
-  const totals: Cell[] = [
-    { value: "TOTAL",                                bg: HDR, color: GOLD, bold: true, align: "left" },
-    { value: ttotal, fmt: BRL,                       bg: HDR, color: GOLD, bold: true },
-    { value: tenv,   fmt: BRL,                       bg: HDR, color: GREEN, bold: true },
-    { value: tcart,  fmt: BRL,                       bg: HDR, color: AMBER, bold: true },
-    { value: ttotal > 0 ? tenv / ttotal : 0, fmt: PCT, bg: HDR, color: GOLD, bold: true },
-    { value: rows.reduce((s, [, d]) => s + d.qtdTotal, 0),   bg: HDR, color: GRAY },
-    { value: rows.reduce((s, [, d]) => s + d.qtdEnviado, 0), bg: HDR, color: GREEN },
-  ];
-  totals.forEach((c, ci) => applyCell(ws.getCell(tr, ci + 1), c));
+  const tr = 3 + rows.length;
+  ws.getRow(tr).height = 20;
+  const tt = (fn: (d: FornData) => number) => rows.reduce((s, [, d]) => s + fn(d), 0);
+  tot(ws.getCell(tr, 1), "TOTAL", undefined, "left");
+  tot(ws.getCell(tr, 2), tt((d) => d.emCarteira), BRL);
+  tot(ws.getCell(tr, 3), tt((d) => d.separado),   BRL);
+  tot(ws.getCell(tr, 4), tt((d) => d.aguardando), BRL);
+  tot(ws.getCell(tr, 5), tt((d) => d.enviado),    BRL);
+  const grand = tt((d) => d.emCarteira + d.separado + d.aguardando + d.enviado);
+  const grandEnv = tt((d) => d.enviado);
+  tot(ws.getCell(tr, 6), grand, BRL);
+  tot(ws.getCell(tr, 7), grand > 0 ? grandEnv / grand : 0, PCT);
+  tot(ws.getCell(tr, 8), tt((d) => d.qtd), INT);
+  tot(ws.getCell(tr, 9), tt((d) => d.qtdEnv), INT);
 }
 
-// ─── Sheet 4: Caixa ──────────────────────────────────────────────────────────
-function buildCaixaSheet(wb: any, caixa: CaixaRecord[]) {
-  const ws = wb.addWorksheet("💰 Caixa");
-  ws.views = [{ showGridLines: false }];
+// ══════════════════════════════════════════════════════════════════════════════
+//  ABA 4 — Histórico de Envios (cheques saídos)
+// ══════════════════════════════════════════════════════════════════════════════
+function buildEnviosSheet(wb: AW, notas: NFRecord[]) {
+  const enviadas = notas.filter(isEnviado).sort((a, b) => {
+    const da = a.chequeEnviadoEm ?? a.createdAt ?? "";
+    const db = b.chequeEnviadoEm ?? b.createdAt ?? "";
+    return da.localeCompare(db);
+  });
 
-  const COLS = [
-    { header: "Data",            width: 14 },
-    { header: "Saldo Anterior",  width: 18 },
-    { header: "Entrada",         width: 16 },
-    { header: "Saída",           width: 16 },
-    { header: "Saldo Total",     width: 18 },
-    { header: "Destino / Origem",width: 28 },
+  const ws: AW = wb.addWorksheet("Histórico Envios", { views: [{ state: "frozen", ySplit: 2, showGridLines: false }] });
+  ws.columns = [
+    { width: 16 }, // Data Envio
+    { width: 28 }, // Fornecedor
+    { width: 16 }, // NF
+    { width: 16 }, // Filial
+    { width: 16 }, // Valor
+    { width: 20 }, // Status NF
+    { width: 18 }, // Acumulado
   ];
-  COLS.forEach((col, i) => { ws.getColumn(i + 1).width = col.width; });
 
-  for (let r = 1; r <= caixa.length + 5; r++) {
-    ws.getRow(r).height = r === 1 ? 34 : r === 2 ? 8 : 20;
-    for (let c = 1; c <= COLS.length; c++) {
-      ws.getCell(r, c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + BG } };
-    }
-  }
+  ws.mergeCells("A1:G1");
+  const t = ws.getCell("A1");
+  t.value = `HISTÓRICO DE ENVIOS DE CHEQUE — ${enviadas.length} NFs enviadas`;
+  t.font  = { bold: true, size: 13, color: { argb: GOLD }, name: "Arial" };
+  t.fill  = fill(GRN_H);
+  t.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(1).height = 26;
 
-  title(ws, `MOVIMENTOS DE CAIXA — ${caixa.length} registros`, COLS.length);
-  ws.getRow(2).height = 8;
-  hdrRow(ws, 3, COLS.map((c) => c.header));
+  ([
+    ["Data Envio",  GRN_H],
+    ["Fornecedor",  NAVY],
+    ["NF",          NAVY],
+    ["Filial",      NAVY],
+    ["Valor",       GRN_H],
+    ["Status NF",   TEL_H],
+    ["Acumulado",   GRN_H],
+  ] as [string, string][]).forEach(([h, bg], ci) => hdr(ws.getCell(2, ci + 1), h, bg));
+  ws.getRow(2).height = 20;
+
+  let running = 0;
+  enviadas.forEach((n, i) => {
+    const ri  = 3 + i;
+    const bg  = zebra(i);
+    ws.getRow(ri).height = 17;
+    running += n.valor;
+
+    dat(ws.getCell(ri, 1), fmtDateISO(n.chequeEnviadoEm ?? n.createdAt), undefined, GRN_T, bg, "center", true);
+    dat(ws.getCell(ri, 2), n.fornecedor, undefined, INK, bg, "left", true);
+    dat(ws.getCell(ri, 3), n.nf,         undefined, INK, bg, "left");
+    dat(ws.getCell(ri, 4), n.filial,     undefined, GRAY_T, bg, "center");
+    dat(ws.getCell(ri, 5), n.valor,      BRL, GRN_T, bg, "right", true);
+    dat(ws.getCell(ri, 6), n.statusNf,   undefined, GRAY_T, bg, "left");
+    dat(ws.getCell(ri, 7), running,      BRL, GRN_T, bg, "right");
+  });
+
+  const tr = 3 + enviadas.length;
+  ws.getRow(tr).height = 20;
+  const tv = enviadas.reduce((s, n) => s + n.valor, 0);
+  tot(ws.getCell(tr, 1), "TOTAL", undefined, "left");
+  tot(ws.getCell(tr, 2), `${enviadas.length} NFs enviadas`, undefined, "left");
+  emptyNav(ws.getCell(tr, 3)); emptyNav(ws.getCell(tr, 4));
+  tot(ws.getCell(tr, 5), tv,  BRL);
+  emptyNav(ws.getCell(tr, 6));
+  tot(ws.getCell(tr, 7), tv,  BRL);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ABA 5 — Caixa de Cheques (histórico completo com análise)
+// ══════════════════════════════════════════════════════════════════════════════
+function buildCaixaSheet(wb: AW, caixa: CaixaRecord[]) {
+  const ws: AW = wb.addWorksheet("Caixa de Cheques", { views: [{ state: "frozen", ySplit: 2, showGridLines: false }] });
+  ws.columns = [
+    { width: 12 }, // Data
+    { width: 16 }, // Saldo Anterior
+    { width: 16 }, // Entrada
+    { width: 16 }, // Saída
+    { width: 16 }, // Saldo Total
+    { width: 28 }, // Destino/Origem
+    { width: 16 }, // Variação (Δ)
+  ];
+
+  ws.mergeCells("A1:G1");
+  const t = ws.getCell("A1");
+  t.value = `MOVIMENTOS DE CAIXA DE CHEQUES — ${caixa.length} lançamentos`;
+  t.font  = { bold: true, size: 13, color: { argb: GOLD }, name: "Arial" };
+  t.fill  = fill(NAVY);
+  t.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(1).height = 26;
+
+  ([
+    ["Data",           NAVY],
+    ["Saldo Anterior", NAVY],
+    ["Entrada",        GRN_H],
+    ["Saída",          RED_H],
+    ["Saldo Total",    TEL_H],
+    ["Destino / Origem", NAVY],
+    ["Δ Variação",     NAVY],
+  ] as [string, string][]).forEach(([h, bg], ci) => hdr(ws.getCell(2, ci + 1), h, bg));
+  ws.getRow(2).height = 20;
 
   caixa.forEach((c, i) => {
-    const r = i + 4;
-    ws.getRow(r).height = 20;
-    const bg = i % 2 === 0 ? CARD : ALT;
-    const row: Cell[] = [
-      { value: c.data,                    bg, color: GRAY },
-      { value: c.saldoAnterior, fmt: BRL, bg, color: GRAY },
-      { value: c.entrada,       fmt: BRL, bg, color: c.entrada > 0 ? GREEN : GRAY },
-      { value: c.saida,         fmt: BRL, bg, color: c.saida   > 0 ? RED   : GRAY },
-      { value: c.saldoTotal,    fmt: BRL, bg, color: c.saldoTotal >= 0 ? WHITE : RED, bold: true },
-      { value: c.destino ?? c.origem ?? "—", bg, color: GRAY, align: "left" },
-    ];
-    row.forEach((ce, ci) => applyCell(ws.getCell(r, ci + 1), ce));
+    const ri   = 3 + i;
+    const bg   = zebra(i);
+    ws.getRow(ri).height = 17;
+    const delta = c.entrada - c.saida;
+    const deltaC = delta > 0 ? GRN_T : delta < 0 ? RED_T : GRAY_T;
+
+    dat(ws.getCell(ri, 1), c.data,                       undefined, INK,    bg, "center", true);
+    dat(ws.getCell(ri, 2), c.saldoAnterior,               BRL,       GRAY_T, bg, "right");
+    dat(ws.getCell(ri, 3), c.entrada > 0 ? c.entrada : null, BRL,   GRN_T,  bg, "right");
+    dat(ws.getCell(ri, 4), c.saida   > 0 ? c.saida   : null, BRL,   RED_T,  bg, "right");
+    dat(ws.getCell(ri, 5), c.saldoTotal,                  BRL,       c.saldoTotal >= 0 ? GRN_T : RED_T, bg, "right", true);
+    dat(ws.getCell(ri, 6), c.destino ?? c.origem ?? "—",  undefined, GRAY_T, bg, "left");
+    dat(ws.getCell(ri, 7), delta,                         DELT,      deltaC, bg, "right");
   });
 
-  const tr = caixa.length + 4;
-  ws.getRow(tr).height = 26;
+  const tr = 3 + caixa.length;
+  ws.getRow(tr).height = 20;
   const last = caixa[caixa.length - 1];
-  const totals: Cell[] = [
-    { value: "SALDO ATUAL",                                   bg: HDR, color: GOLD, bold: true },
-    { value: "",                                              bg: HDR, color: WHITE },
-    { value: caixa.reduce((s, c) => s + c.entrada, 0), fmt: BRL, bg: HDR, color: GREEN, bold: true },
-    { value: caixa.reduce((s, c) => s + c.saida, 0),   fmt: BRL, bg: HDR, color: RED,   bold: true },
-    { value: last?.saldoTotal ?? 0, fmt: BRL,                 bg: HDR, color: GOLD, bold: true },
-    { value: `${caixa.length} movimentos`,                    bg: HDR, color: GRAY },
-  ];
-  totals.forEach((c, ci) => applyCell(ws.getCell(tr, ci + 1), c));
+  const totEnt  = caixa.reduce((s, c) => s + c.entrada, 0);
+  const totSai  = caixa.reduce((s, c) => s + c.saida, 0);
+  tot(ws.getCell(tr, 1), "SALDO ATUAL", undefined, "left");
+  emptyNav(ws.getCell(tr, 2));
+  tot(ws.getCell(tr, 3), totEnt, BRL);
+  tot(ws.getCell(tr, 4), totSai, BRL);
+  tot(ws.getCell(tr, 5), last?.saldoTotal ?? 0, BRL);
+  tot(ws.getCell(tr, 6), `${caixa.length} movimentos`, undefined, "left");
+  tot(ws.getCell(tr, 7), totEnt - totSai, DELT);
 }
 
-// ─── Sheet 5: Devolvidos ─────────────────────────────────────────────────────
-function buildDevolvidosSheet(wb: any, devs: any[]) {
-  const ws = wb.addWorksheet("↩️ Devolvidos");
-  ws.views = [{ showGridLines: false }];
+// ══════════════════════════════════════════════════════════════════════════════
+//  ABA 6 — Cheques Devolvidos (análise completa)
+// ══════════════════════════════════════════════════════════════════════════════
+type DevRow = {
+  id: string;
+  data: string;
+  valor_devolvido: number;
+  valor_rec_fornecedor: number;
+  valor_rec_empresa: number;
+  created_at: string;
+};
 
-  const COLS = [
-    { header: "Data",           width: 14 },
-    { header: "Valor Devolvido",width: 18 },
-    { header: "Rec. Fornecedor",width: 18 },
-    { header: "Rec. Empresa",   width: 18 },
-    { header: "Total Recuperado",width:18 },
-    { header: "Pendente",       width: 16 },
-    { header: "% Recuperado",   width: 16 },
+function buildDevolvidosSheet(wb: AW, rows: DevRow[]) {
+  const sorted = [...rows].sort((a, b) => b.data.localeCompare(a.data));
+  const ws: AW = wb.addWorksheet("Devolvidos", { views: [{ state: "frozen", ySplit: 2, showGridLines: false }] });
+  ws.columns = [
+    { width: 13 }, // Data
+    { width: 22 }, // Tipo
+    { width: 16 }, // Devolvido
+    { width: 16 }, // Total Rec.
+    { width: 16 }, // Pendente
+    { width: 12 }, // % Recuperado
+    { width: 22 }, // Status
+    { width: 14 }, // Dias em aberto
   ];
-  COLS.forEach((col, i) => { ws.getColumn(i + 1).width = col.width; });
 
-  for (let r = 1; r <= devs.length + 5; r++) {
-    ws.getRow(r).height = r === 1 ? 34 : r === 2 ? 8 : 20;
-    for (let c = 1; c <= COLS.length; c++) {
-      ws.getCell(r, c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + BG } };
-    }
-  }
+  const totDev  = rows.reduce((s, r) => s + Number(r.valor_devolvido    || 0), 0);
+  const totRecF = rows.reduce((s, r) => s + Number(r.valor_rec_fornecedor || 0), 0);
+  const totRecE = rows.reduce((s, r) => s + Number(r.valor_rec_empresa   || 0), 0);
+  const totRec  = totRecF + totRecE;
+  const totPend = totDev - totRec;
+  const taxa    = totDev > 0 ? totRec / totDev : 0;
 
-  title(ws, `CHEQUES DEVOLVIDOS — ${devs.length} lançamentos`, COLS.length);
-  ws.getRow(2).height = 8;
-  hdrRow(ws, 3, COLS.map((c) => c.header));
+  const pendentes = rows.filter((r) => {
+    const d = Number(r.valor_devolvido || 0);
+    const rec = Number(r.valor_rec_fornecedor || 0) + Number(r.valor_rec_empresa || 0);
+    return d > 0 && d - rec > 0;
+  });
+  const titleBg = pendentes.length === 0 ? GRN_H : RED_H;
 
-  devs.forEach((d, i) => {
-    const r = i + 4;
-    ws.getRow(r).height = 20;
-    const bg = i % 2 === 0 ? CARD : ALT;
-    const totalRec = (d.valor_rec_fornecedor ?? 0) + (d.valor_rec_empresa ?? 0);
-    const pendente = Math.max(0, (d.valor_devolvido ?? 0) - totalRec);
-    const pct      = d.valor_devolvido > 0 ? totalRec / d.valor_devolvido : 0;
-    const pctColor = pct >= 1 ? GREEN : (pct > 0 ? AMBER : RED);
-    const row: Cell[] = [
-      { value: d.data,                              bg, color: WHITE, bold: true },
-      { value: d.valor_devolvido,        fmt: BRL,  bg, color: RED },
-      { value: d.valor_rec_fornecedor || null, fmt: BRL, bg, color: d.valor_rec_fornecedor ? GREEN : GRAY },
-      { value: d.valor_rec_empresa    || null, fmt: BRL, bg, color: d.valor_rec_empresa    ? GREEN : GRAY },
-      { value: totalRec > 0 ? totalRec : null, fmt: BRL, bg, color: GREEN },
-      { value: pendente > 0 ? pendente : null,  fmt: BRL, bg, color: pendente > 0 ? RED : GRAY },
-      { value: pct > 0 ? pct : null,        fmt: PCT, bg, color: pctColor, bold: true },
-    ];
-    row.forEach((c, ci) => applyCell(ws.getCell(r, ci + 1), c));
+  ws.mergeCells("A1:H1");
+  const t = ws.getCell("A1");
+  t.value = pendentes.length === 0
+    ? `✅  CHEQUES DEVOLVIDOS — ${rows.length} lançamentos · todos quitados`
+    : `⚠️  CHEQUES DEVOLVIDOS — ${rows.length} lançamentos · ${pendentes.length} pendente(s)`;
+  t.font  = { bold: true, size: 13, color: { argb: GOLD }, name: "Arial" };
+  t.fill  = fill(titleBg);
+  t.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(1).height = 26;
+
+  ([
+    ["Data",          NAVY],
+    ["Tipo",          NAVY],
+    ["Devolvido",     RED_H],
+    ["Total Rec.",    GRN_H],
+    ["Pendente",      AMB_H],
+    ["% Recup.",      TEL_H],
+    ["Status",        NAVY],
+    ["Dias Aberto",   RED_H],
+  ] as [string, string][]).forEach(([h, bg], ci) => hdr(ws.getCell(2, ci + 1), h, bg));
+  ws.getRow(2).height = 20;
+
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+
+  sorted.forEach((r, i) => {
+    const dev    = Number(r.valor_devolvido    || 0);
+    const rF     = Number(r.valor_rec_fornecedor || 0);
+    const rE     = Number(r.valor_rec_empresa   || 0);
+    const rec    = rF + rE;
+    const pend   = dev - rec;
+    const pct    = dev > 0 ? rec / dev : null;
+    const avulsa = dev <= 0 && rec > 0;
+
+    const dataDate = new Date(`${r.data}T00:00:00`);
+    const dias = !avulsa && pend > 0
+      ? Math.floor((hoje.getTime() - dataDate.getTime()) / 86400000)
+      : null;
+    const diasC = dias === null ? GRAY_T : dias > 90 ? RED_T : dias > 30 ? AMB_T : INK;
+
+    const status  = avulsa ? "—"
+                  : pend <= 0 ? "✓ Quitado"
+                  : rec > 0   ? "⏳ Parcial"
+                              : "❌ Sem recuperação";
+    const statusC = avulsa ? GRAY_T
+                  : pend <= 0 ? GRN_T
+                  : rec > 0   ? AMB_T
+                              : RED_T;
+
+    const ri = 3 + i;
+    const bg = avulsa ? zebra(i) : pend <= 0 ? "FFF0FFF4" : zebra(i);
+    ws.getRow(ri).height = 17;
+
+    dat(ws.getCell(ri, 1), fmtDateISO(r.data),                           undefined, INK,     bg, "left");
+    dat(ws.getCell(ri, 2), avulsa ? "Recuperação avulsa" : "Devolvido",  undefined, avulsa ? BLU_T : RED_T, bg, "left");
+    dat(ws.getCell(ri, 3), dev > 0 ? dev : null,                          BRL,       RED_T,   bg, "right");
+    dat(ws.getCell(ri, 4), rec > 0 ? rec : null,                          BRL,       GRN_T,   bg, "right");
+    dat(ws.getCell(ri, 5), !avulsa && pend > 0 ? pend : null,             BRL,       AMB_T,   bg, "right", true);
+    dat(ws.getCell(ri, 6), pct,                                            PCT,       pct === null ? GRAY_T : pct >= 1 ? GRN_T : pct >= 0.5 ? AMB_T : RED_T, bg, "right");
+    dat(ws.getCell(ri, 7), status,                                         undefined, statusC, bg, "left");
+    dat(ws.getCell(ri, 8), dias,                                           INT,       diasC,   bg, "right", dias !== null && dias > 30);
   });
 
-  const tr = devs.length + 4;
-  ws.getRow(tr).height = 26;
-  const tDev = devs.reduce((s, d) => s + (d.valor_devolvido ?? 0), 0);
-  const tRec = devs.reduce((s, d) => s + (d.valor_rec_fornecedor ?? 0) + (d.valor_rec_empresa ?? 0), 0);
-  const totals: Cell[] = [
-    { value: "TOTAL",               bg: HDR, color: GOLD,  bold: true },
-    { value: tDev, fmt: BRL,        bg: HDR, color: RED,   bold: true },
-    { value: "",                    bg: HDR, color: WHITE },
-    { value: "",                    bg: HDR, color: WHITE },
-    { value: tRec, fmt: BRL,        bg: HDR, color: GREEN, bold: true },
-    { value: tDev - tRec, fmt: BRL, bg: HDR, color: RED,   bold: true },
-    { value: tDev > 0 ? tRec / tDev : 0, fmt: PCT, bg: HDR, color: GOLD, bold: true },
-  ];
-  totals.forEach((c, ci) => applyCell(ws.getCell(tr, ci + 1), c));
+  const totR = 3 + sorted.length;
+  ws.getRow(totR).height = 20;
+  tot(ws.getCell(totR, 1), "TOTAL",   undefined, "left");
+  emptyNav(ws.getCell(totR, 2));
+  tot(ws.getCell(totR, 3), totDev,    BRL);
+  tot(ws.getCell(totR, 4), totRec,    BRL);
+  tot(ws.getCell(totR, 5), totPend > 0 ? totPend : 0, BRL);
+  tot(ws.getCell(totR, 6), taxa,      PCT);
+  emptyNav(ws.getCell(totR, 7));
+  emptyNav(ws.getCell(totR, 8));
 }
 
-// ─── Main export ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+//  Função principal
+// ══════════════════════════════════════════════════════════════════════════════
 export async function buildPainelWorkbook(
   notas: NFRecord[],
   caixa: CaixaRecord[],
 ): Promise<Blob> {
-  const { Workbook } = (await ExcelJS()).default ?? (await ExcelJS());
+  // @ts-ignore
+  const ExcelJS: any = (await import("exceljs")).default; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Painel Cheques — Grupo Ley";
+  wb.created = new Date();
 
-  // fetch devolvidos
+  // Busca devolvidos do banco
   const { data: devsData } = await supabase
     .from("cheques_devolvidos")
     .select("id,data,valor_devolvido,valor_rec_fornecedor,valor_rec_empresa,created_at")
     .order("data", { ascending: false });
-  const devs = devsData ?? [];
+  const devolvidos: DevRow[] = (devsData ?? []) as DevRow[];
 
-  const wb = new Workbook();
-  wb.creator = "Painel Grupo Ley";
-  wb.created = new Date();
+  const now = new Date();
+  const todayBR = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
 
-  buildNotasSheet(wb, notas);
-  buildEnviosSheet(wb, notas);
+  buildResumoSheet(wb, notas, caixa, devolvidos, todayBR);
+  buildCarteiraNFsSheet(wb, notas);
   buildFornecedorSheet(wb, notas);
+  buildEnviosSheet(wb, notas);
   buildCaixaSheet(wb, caixa);
-  buildDevolvidosSheet(wb, devs);
+  buildDevolvidosSheet(wb, devolvidos);
 
-  const buf = await wb.xlsx.writeBuffer();
-  return new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  wb.views = [{ activeTab: 0 }];
+
+  const buffer = await wb.xlsx.writeBuffer();
+  return new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
 }

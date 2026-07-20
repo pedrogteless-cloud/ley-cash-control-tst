@@ -1,6 +1,8 @@
 // Geração de planilha Excel para Cheques Devolvidos — Grupo Ley
 // Paleta visual alinhada com o design do software (navy + ouro + semáforo).
 
+import { supabase } from "@/integrations/supabase/client";
+
 // ── Paleta ────────────────────────────────────────────────────────────────────
 const NAVY    = "FF0D1117";
 const GOLD    = "FFF0B429";
@@ -16,6 +18,7 @@ const RED_T   = "FF8B1A1A";
 const GRN_T   = "FF1A5E35";
 const AMB_T   = "FF8B5A00";
 const BLU_T   = "FF0D3B73";
+const GRAY_T  = "FF5A5A6E";
 
 const BRL  = '"R$" #,##0.00';
 const PCT  = "0.0%";
@@ -121,13 +124,33 @@ export async function buildDevolvidosWorkbook(
 
   const sorted = [...rows].sort((a, b) => b.data.localeCompare(a.data));
 
-  // ── Totais globais ─────────────────────────────────────────────────────────
+  // ── Busca notas enviadas no mesmo período (para correlação) ───────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let notasQuery: any = supabase
+    .from("notas_fiscais")
+    .select("valor, cheque_enviado_em, fornecedor")
+    .eq("status_envio", "ENVIADO")
+    .not("cheque_enviado_em", "is", null);
+
+  if (period?.from) notasQuery = notasQuery.gte("cheque_enviado_em", period.from);
+  if (period?.to)   notasQuery = notasQuery.lte("cheque_enviado_em", period.to + "T23:59:59");
+
+  const { data: notasData } = await notasQuery;
+  const notasEnviadas: { valor: number; cheque_enviado_em: string; fornecedor: string }[] =
+    (notasData ?? []) as { valor: number; cheque_enviado_em: string; fornecedor: string }[];
+
+  const totEnviado = notasEnviadas.reduce((s, n) => s + Number(n.valor || 0), 0);
+
+  // ── Totais globais de devolvidos ──────────────────────────────────────────
   const totDev  = rows.reduce((s, r) => s + Number(r.valor_devolvido    || 0), 0);
   const totRecF = rows.reduce((s, r) => s + Number(r.valor_rec_fornecedor || 0), 0);
   const totRecE = rows.reduce((s, r) => s + Number(r.valor_rec_empresa   || 0), 0);
   const totRec  = totRecF + totRecE;
   const totPend = totDev - totRec;
   const taxaRec = totDev > 0 ? totRec / totDev : 0;
+
+  // Taxa de inadimplência = quanto do que foi enviado voltou como devolvido
+  const taxaInad = totEnviado > 0 ? totDev / totEnviado : null;
 
   const devRows    = rows.filter(r => Number(r.valor_devolvido) > 0);
   const avulsaRows = rows.filter(r => Number(r.valor_devolvido) <= 0 &&
@@ -145,7 +168,55 @@ export async function buildDevolvidosWorkbook(
     return p > mx ? p : mx;
   }, 0);
 
-  // ── Agregação mensal (ordenada cronologicamente para cálculo de delta) ──────
+  // ── Agregação cruzada por mês: enviado × devolvido ────────────────────────
+  type CrossMonth = { enviado: number; devolvido: number; recuperado: number };
+  const crossMap = new Map<string, CrossMonth>();
+
+  for (const n of notasEnviadas) {
+    const ym = n.cheque_enviado_em.slice(0, 7);
+    const e = crossMap.get(ym) ?? { enviado: 0, devolvido: 0, recuperado: 0 };
+    e.enviado += Number(n.valor || 0);
+    crossMap.set(ym, e);
+  }
+  for (const r of rows) {
+    const ym = ymKey(r.data);
+    const e = crossMap.get(ym) ?? { enviado: 0, devolvido: 0, recuperado: 0 };
+    e.devolvido  += Number(r.valor_devolvido    || 0);
+    e.recuperado += Number(r.valor_rec_fornecedor || 0) + Number(r.valor_rec_empresa || 0);
+    crossMap.set(ym, e);
+  }
+
+  const crossAsc = [...crossMap.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([ym, v], idx, arr) => {
+      const taxaRetorno   = v.enviado    > 0 ? v.devolvido  / v.enviado    : null;
+      const taxaRecupMes  = v.devolvido  > 0 ? v.recuperado / v.devolvido  : null;
+      const pendente      = v.devolvido - v.recuperado;
+      const prev          = idx > 0 ? arr[idx - 1][1] : null;
+      const prevTaxaRet   = prev && prev.enviado > 0 ? prev.devolvido / prev.enviado : null;
+      return {
+        ym, label: fmtMonthBR(ym),
+        enviado: v.enviado, devolvido: v.devolvido,
+        recuperado: v.recuperado, pendente,
+        taxaRetorno, taxaRecupMes,
+        deltaEnv:  prev !== null ? v.enviado   - prev.enviado   : null,
+        deltaDev:  prev !== null ? v.devolvido  - prev.devolvido : null,
+        deltaTaxa: taxaRetorno !== null && prevTaxaRet !== null
+          ? taxaRetorno - prevTaxaRet : null,
+      };
+    });
+  const crossDesc = [...crossAsc].reverse();
+
+  // Melhor / pior mês (taxa de inadimplência) — apenas meses com envio
+  const crossComEnvio = crossAsc.filter(m => m.enviado > 0 && m.taxaRetorno !== null);
+  const mesMenorInad = crossComEnvio.length
+    ? crossComEnvio.reduce((mn, m) => (m.taxaRetorno ?? 1) < (mn.taxaRetorno ?? 1) ? m : mn, crossComEnvio[0])
+    : null;
+  const mesMaiorInad = crossComEnvio.length
+    ? crossComEnvio.reduce((mx, m) => (m.taxaRetorno ?? 0) > (mx.taxaRetorno ?? 0) ? m : mx, crossComEnvio[0])
+    : null;
+
+  // ── Agregação mensal de devolvidos (para Resumo existente) ────────────────
   const mMap = new Map<string, { dev: number; rF: number; rE: number }>();
   for (const r of rows) {
     const ym = ymKey(r.data);
@@ -156,7 +227,6 @@ export async function buildDevolvidosWorkbook(
     mMap.set(ym, e);
   }
 
-  // Crono asc para deltas
   const monthsAsc = [...mMap.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([ym, v], idx, arr) => {
@@ -175,9 +245,8 @@ export async function buildDevolvidosWorkbook(
         deltaTaxa: prevTaxa !== null && taxa !== null ? taxa - prevTaxa : null,
       };
     });
-  const months = [...monthsAsc].reverse(); // desc para exibição
+  const months = [...monthsAsc].reverse();
 
-  // Melhor / pior mês
   const mComDev = monthsAsc.filter(m => m.dev > 0);
   const mesMaiorDev  = mComDev.reduce((mx, m) => m.dev  > mx.dev  ? m : mx, mComDev[0]);
   const mesMelhorTaxa = mComDev
@@ -202,9 +271,9 @@ export async function buildDevolvidosWorkbook(
     { width: 18 }, // E
     { width: 16 }, // F
     { width: 13 }, // G
-    { width: 13 }, // H — Particip.
-    { width: 14 }, // I — Δ Dev
-    { width: 12 }, // J — Δ Taxa
+    { width: 13 }, // H
+    { width: 14 }, // I
+    { width: 12 }, // J
   ];
 
   // Título
@@ -218,16 +287,16 @@ export async function buildDevolvidosWorkbook(
 
   wsR.mergeCells("A2:J2");
   const rS = wsR.getCell("A2");
-  rS.value = `Exportado em ${todayBR}  ·  Período: ${periodLabel(period)}  ·  ${rows.length} lançamento${rows.length !== 1 ? "s" : ""}`;
+  rS.value = `Exportado em ${todayBR}  ·  Período: ${periodLabel(period)}  ·  ${rows.length} lançamento${rows.length !== 1 ? "s" : ""}  ·  ${notasEnviadas.length} cheques enviados no período`;
   rS.font  = { size: 9, italic: true, color: { argb: "FF8B949E" }, name: "Arial" };
   rS.fill  = fill(NAVY);
   rS.alignment = { vertical: "middle", horizontal: "center" };
   wsR.getRow(2).height = 16;
   wsR.getRow(3).height = 8;
 
-  // ── Seção 1: KPIs Acumulados ───────────────────────────────────────────────
+  // ── Seção 1: KPIs Acumulados de Devolvidos ────────────────────────────────
   wsR.mergeCells("A4:J4");
-  hdr(wsR.getCell("A4"), "📊  INDICADORES ACUMULADOS DO PERÍODO", GOLD, "left");
+  hdr(wsR.getCell("A4"), "📊  INDICADORES DE DEVOLUÇÕES — PERÍODO", GOLD, "left");
   wsR.getRow(4).height = 22;
 
   hdr(wsR.getCell("A5"), "Indicador", NAVY, "left");
@@ -274,8 +343,62 @@ export async function buildDevolvidosWorkbook(
     wsR.mergeCells(ri, 2, ri, 10);
   });
 
-  // ── Seção 2: Destaques / Insights ─────────────────────────────────────────
-  const insSec = 6 + kpis.length + 1;
+  // ── Seção 2: Correlação Envios × Devoluções ───────────────────────────────
+  const crSec = 6 + kpis.length + 1;
+  wsR.getRow(crSec - 1).height = 8;
+  wsR.mergeCells(crSec, 1, crSec, 10);
+  hdr(wsR.getCell(crSec, 1), "📈  CORRELAÇÃO: CHEQUES ENVIADOS × DEVOLVIDOS", TEL_H, "left");
+  wsR.getRow(crSec).height = 22;
+
+  const inadColor = taxaInad === null ? GRAY_T
+    : taxaInad <= 0.02 ? GRN_T
+    : taxaInad <= 0.05 ? AMB_T
+    : RED_T;
+
+  const crKpis: KpiRow[] = [
+    ["Total de cheques enviados no período",              totEnviado,  BRL, INK,  true],
+    ["Total de cheques devolvidos (valor de face)",       totDev,      BRL, RED_T, true],
+    ["Taxa de inadimplência (devolvido ÷ enviado)",       taxaInad ?? 0, PCT, inadColor, true],
+    ["  Interpretação: % do que foi enviado que voltou",  taxaInad !== null
+        ? taxaInad <= 0.02 ? "✅ Nível saudável (< 2%)"
+        : taxaInad <= 0.05 ? "⚠ Atenção moderada (2%–5%)"
+        : "🔴 Nível elevado (> 5%)" : "— Sem envios no período",
+      undefined, inadColor],
+    ["Devolvido ainda não recuperado (exposição líquida)", totPend > 0 ? totPend : 0, BRL, totPend > 0 ? RED_T : GRN_T, true],
+    ["Taxa de recuperação sobre o que voltou",            taxaRec, PCT, taxaRec >= 1 ? GRN_T : taxaRec >= 0.5 ? AMB_T : RED_T],
+    mesMenorInad
+      ? ["Mês com menor inadimplência", `${mesMenorInad.label} — ${((mesMenorInad.taxaRetorno ?? 0) * 100).toFixed(1)}%`, undefined, GRN_T]
+      : ["Mês com menor inadimplência", "— Sem dados suficientes", undefined, GRAY_T],
+    mesMaiorInad && mesMaiorInad.ym !== mesMenorInad?.ym
+      ? ["Mês com maior inadimplência", `${mesMaiorInad.label} — ${((mesMaiorInad.taxaRetorno ?? 0) * 100).toFixed(1)}%`, undefined, RED_T]
+      : ["Mês com maior inadimplência", "— Sem dados suficientes", undefined, GRAY_T],
+  ];
+
+  crKpis.forEach(([label, value, fmt, color, bold], i) => {
+    const ri = crSec + 1 + i;
+    const bg = zebra(i);
+    wsR.getRow(ri).height = 17;
+
+    const la = wsR.getCell(ri, 1);
+    la.value = label;
+    la.font  = { size: 9, color: { argb: INK }, name: "Arial",
+                 bold: !!bold, italic: (label as string).startsWith("  ") };
+    la.fill  = fill(bg);
+    la.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+    la.border = brd();
+
+    const va = wsR.getCell(ri, 2);
+    va.value = value;
+    if (fmt && typeof value === "number") va.numFmt = fmt;
+    va.font  = { size: 10, bold: !!bold, color: { argb: color }, name: "Arial" };
+    va.fill  = fill(bg);
+    va.alignment = { vertical: "middle", horizontal: "right" };
+    va.border = brd();
+    wsR.mergeCells(ri, 2, ri, 10);
+  });
+
+  // ── Seção 3: Destaques / Insights ─────────────────────────────────────────
+  const insSec = crSec + crKpis.length + 1;
   wsR.getRow(insSec - 1).height = 8;
   wsR.mergeCells(insSec, 1, insSec, 10);
   hdr(wsR.getCell(insSec, 1), "💡  DESTAQUES DO PERÍODO", NAVY, "left");
@@ -306,16 +429,14 @@ export async function buildDevolvidosWorkbook(
     ]);
   }
   if (months.length > 1) {
-    const ultimo  = months[0];
+    const ultimo   = months[0];
     const anterior = months[1];
-    const sinal = ultimo.dev < anterior.dev ? "↓ Queda" : "↑ Alta";
-    const cor   = ultimo.dev < anterior.dev ? GRN_T : RED_T;
+    const sinal    = ultimo.dev < anterior.dev ? "↓ Queda" : "↑ Alta";
     insights.push([
       `Variação de devoluções (${anterior.label} → ${ultimo.label})`,
       sinal,
       (ultimo.dev - anterior.dev).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
     ]);
-    void cor;
   }
   if (taxaRec > 0) {
     insights.push([
@@ -323,6 +444,18 @@ export async function buildDevolvidosWorkbook(
       totPend <= 0 ? "✅ Zerado" : `${((totPend / totDev) * 100).toFixed(1)}% do total devolvido ainda pendente`,
       totPend > 0 ? totPend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—",
     ]);
+  }
+  if (taxaInad !== null) {
+    const trend = crossDesc.length >= 2
+      ? (crossDesc[0].taxaRetorno ?? 0) < (crossDesc[1].taxaRetorno ?? 0) ? "↓ Melhora" : "↑ Piora"
+      : null;
+    if (trend) {
+      insights.push([
+        `Tendência de inadimplência (${crossDesc[1]?.label} → ${crossDesc[0]?.label})`,
+        trend,
+        `Taxa atual: ${((crossDesc[0]?.taxaRetorno ?? 0) * 100).toFixed(1)}%`,
+      ]);
+    }
   }
 
   insights.forEach(([descr, destaque, valor], i) => {
@@ -337,7 +470,7 @@ export async function buildDevolvidosWorkbook(
     dat(wsR.getCell(ri, 8), valor,    undefined, INK, bg, "right", true);
   });
 
-  // ── Seção 3: Resumo Mensal com Indicadores ────────────────────────────────
+  // ── Seção 4: Resumo Mensal de Devolvidos ──────────────────────────────────
   const mSec = insSec + insights.length + 2;
   wsR.getRow(mSec - 1).height = 8;
   wsR.mergeCells(mSec, 1, mSec, 10);
@@ -381,7 +514,6 @@ export async function buildDevolvidosWorkbook(
     dat(wsR.getCell(ri, 10),m.deltaTaxa,                    DPCT,      dTaxColor, bg, "right");
   });
 
-  // Linha total
   const mTot = mHdr + 1 + months.length;
   wsR.getRow(mTot).height = 20;
   tot(wsR.getCell(mTot, 1), "TOTAL",   undefined, "left");
@@ -398,7 +530,138 @@ export async function buildDevolvidosWorkbook(
   wsR.views = [{ state: "frozen", ySplit: 2, showGridLines: false }];
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  ABA 2 — Lançamentos Completos
+  //  ABA 2 — Inadimplência por Mês (NOVA: enviado × devolvido cruzado)
+  // ══════════════════════════════════════════════════════════════════════════
+  const wsI: AW = wb.addWorksheet("Inadimplência por Mês", { views: [{ state: "frozen", ySplit: 2, showGridLines: false }] });
+  wsI.columns = [
+    { width: 13 }, // A — Mês
+    { width: 20 }, // B — Enviado
+    { width: 18 }, // C — Devolvido
+    { width: 14 }, // D — Taxa Inadimpl.%
+    { width: 18 }, // E — Recuperado
+    { width: 18 }, // F — Pendente
+    { width: 14 }, // G — Taxa Recup.%
+    { width: 16 }, // H — Δ Enviado
+    { width: 16 }, // I — Δ Devolvido
+    { width: 14 }, // J — Δ Taxa Inad.
+  ];
+
+  wsI.mergeCells("A1:J1");
+  const iT = wsI.getCell("A1");
+  iT.value = "ANÁLISE DE INADIMPLÊNCIA — CHEQUES ENVIADOS × DEVOLVIDOS POR MÊS";
+  iT.font  = { bold: true, size: 13, color: { argb: GOLD }, name: "Arial" };
+  iT.fill  = fill(NAVY);
+  iT.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  wsI.getRow(1).height = 28;
+
+  wsI.mergeCells("A2:J2");
+  const iS = wsI.getCell("A2");
+  iS.value = `Taxa de inadimplência = Devolvido ÷ Enviado no mesmo mês  ·  Período: ${periodLabel(period)}  ·  ${crossDesc.length} meses com dados`;
+  iS.font  = { size: 9, italic: true, color: { argb: "FF8B949E" }, name: "Arial" };
+  iS.fill  = fill(NAVY);
+  iS.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  wsI.getRow(2).height = 16;
+
+  // KPIs de inadimplência no topo da aba
+  const iKpiRow = 3;
+  const iKpiData: [string, string][] = [
+    ["Total enviado",  totEnviado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })],
+    ["Total devolvido", totDev.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })],
+    ["Taxa inad. global", taxaInad !== null ? `${(taxaInad * 100).toFixed(2)}%` : "—"],
+    ["Exposição líquida", totPend > 0 ? totPend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "✓ Zerado"],
+  ];
+  const iKpiColors = [INK, RED_T, inadColor, totPend > 0 ? RED_T : GRN_T];
+  iKpiData.forEach(([label, value], ci) => {
+    const cell = wsI.getCell(iKpiRow, ci + 1);
+    const col2 = wsI.getCell(iKpiRow + 1, ci + 1);
+    wsI.getRow(iKpiRow).height = 14;
+    wsI.getRow(iKpiRow + 1).height = 22;
+
+    cell.value = label;
+    cell.font  = { size: 8, color: { argb: "FF8B949E" }, name: "Arial" };
+    cell.fill  = fill(WHITE);
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+    cell.border = brd();
+
+    col2.value = value;
+    col2.font  = { bold: true, size: 12, color: { argb: iKpiColors[ci] }, name: "Arial" };
+    col2.fill  = fill(GOLD_LT);
+    col2.alignment = { vertical: "middle", horizontal: "center" };
+    col2.border = brd();
+  });
+
+  wsI.getRow(iKpiRow + 2).height = 8;
+
+  // Cabeçalho da tabela mensal
+  const iHdr = iKpiRow + 3;
+  [
+    ["Mês",              NAVY],
+    ["Enviado",          GRN_H],
+    ["Devolvido",        RED_H],
+    ["Taxa Inad. %",     RED_H],
+    ["Recuperado",       GRN_H],
+    ["Pendente",         AMB_H],
+    ["Taxa Recup. %",    TEL_H],
+    ["Δ Enviado",        NAVY],
+    ["Δ Devolvido",      NAVY],
+    ["Δ Taxa Inad.",     NAVY],
+  ].forEach(([h, bg], ci) => hdr(wsI.getCell(iHdr, ci + 1), h as string, bg as string));
+  wsI.getRow(iHdr).height = 22;
+
+  crossDesc.forEach((m, i) => {
+    const ri   = iHdr + 1 + i;
+    const bg   = zebra(i);
+    wsI.getRow(ri).height = 17;
+
+    const tInadC = m.taxaRetorno === null ? GRAY_T
+      : m.taxaRetorno <= 0.02 ? GRN_T
+      : m.taxaRetorno <= 0.05 ? AMB_T : RED_T;
+    const tRecC  = m.taxaRecupMes === null ? GRAY_T
+      : m.taxaRecupMes >= 1 ? GRN_T
+      : m.taxaRecupMes >= 0.5 ? AMB_T : RED_T;
+    const dEnvC  = m.deltaEnv  === null ? GRAY_T : m.deltaEnv  >= 0 ? GRN_T : RED_T;
+    const dDevC  = m.deltaDev  === null ? GRAY_T : m.deltaDev  <= 0 ? GRN_T : RED_T;
+    const dTaxC  = m.deltaTaxa === null ? GRAY_T : m.deltaTaxa <= 0 ? GRN_T : RED_T;
+
+    dat(wsI.getCell(ri, 1), m.label,                        undefined, INK,   bg, "left", true);
+    dat(wsI.getCell(ri, 2), m.enviado   || null,             BRL,       GRN_T, bg, "right");
+    dat(wsI.getCell(ri, 3), m.devolvido || null,             BRL,       RED_T, bg, "right");
+    dat(wsI.getCell(ri, 4), m.taxaRetorno,                   PCT,       tInadC,bg, "right", true);
+    dat(wsI.getCell(ri, 5), m.recuperado || null,            BRL,       GRN_T, bg, "right");
+    dat(wsI.getCell(ri, 6), m.pendente > 0 ? m.pendente : null, BRL,   AMB_T, bg, "right");
+    dat(wsI.getCell(ri, 7), m.taxaRecupMes,                  PCT,       tRecC, bg, "right");
+    dat(wsI.getCell(ri, 8), m.deltaEnv,                      DELT,      dEnvC, bg, "right");
+    dat(wsI.getCell(ri, 9), m.deltaDev,                      DELT,      dDevC, bg, "right");
+    dat(wsI.getCell(ri, 10),m.deltaTaxa,                     DPCT,      dTaxC, bg, "right");
+  });
+
+  // Linha de total
+  const iTot = iHdr + 1 + crossDesc.length;
+  wsI.getRow(iTot).height = 22;
+  const totPendCross = crossAsc.reduce((s, m) => s + m.pendente, 0);
+  tot(wsI.getCell(iTot, 1), "TOTAL",        undefined, "left");
+  tot(wsI.getCell(iTot, 2), totEnviado,     BRL);
+  tot(wsI.getCell(iTot, 3), totDev,         BRL);
+  tot(wsI.getCell(iTot, 4), taxaInad ?? 0,  PCT);
+  tot(wsI.getCell(iTot, 5), totRec,         BRL);
+  tot(wsI.getCell(iTot, 6), totPendCross > 0 ? totPendCross : 0, BRL);
+  tot(wsI.getCell(iTot, 7), taxaRec,        PCT);
+  emptyNav(wsI.getCell(iTot, 8));
+  emptyNav(wsI.getCell(iTot, 9));
+  emptyNav(wsI.getCell(iTot, 10));
+
+  // Nota explicativa
+  const iNota = iTot + 2;
+  wsI.getRow(iNota).height = 16;
+  wsI.mergeCells(iNota, 1, iNota, 10);
+  const nota = wsI.getCell(iNota, 1);
+  nota.value = "ℹ  Taxa Inad. % = quanto do valor ENVIADO naquele mês voltou como devolvido no mesmo mês. Valores de meses diferentes podem não ter correlação causal direta.";
+  nota.font  = { size: 8, italic: true, color: { argb: GRAY_T }, name: "Arial" };
+  nota.fill  = fill(WHITE);
+  nota.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ABA 3 — Lançamentos Completos
   // ══════════════════════════════════════════════════════════════════════════
   const wsL: AW = wb.addWorksheet("Lançamentos", { views: [{ state: "frozen", ySplit: 2, showGridLines: false }] });
   wsL.columns = [
@@ -474,7 +737,7 @@ export async function buildDevolvidosWorkbook(
   emptyNav(wsL.getCell(lTot, 7));
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  ABA 3 — Pendências em Aberto
+  //  ABA 4 — Pendências em Aberto
   // ══════════════════════════════════════════════════════════════════════════
   const pendentes = sorted
     .filter(r => {
@@ -486,13 +749,13 @@ export async function buildDevolvidosWorkbook(
 
   const wsP: AW = wb.addWorksheet("Pendências", { views: [{ state: "frozen", ySplit: 2, showGridLines: false }] });
   wsP.columns = [
-    { width: 13 }, // Data
-    { width: 14 }, // Dias em aberto
-    { width: 18 }, // Devolvido
-    { width: 18 }, // Recuperado
-    { width: 18 }, // Pendente
-    { width: 12 }, // % Recup.
-    { width: 24 }, // Situação
+    { width: 13 },
+    { width: 14 },
+    { width: 18 },
+    { width: 18 },
+    { width: 18 },
+    { width: 12 },
+    { width: 24 },
   ];
 
   const pTitleBg = pendentes.length === 0 ? GRN_H : RED_H;
