@@ -87,6 +87,8 @@ export function DevolvidosManager() {
   const [showExportForm, setShowExportForm] = useState(false);
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo,   setExportTo]   = useState("");
+  const [enviosFrom, setEnviosFrom] = useState("");
+  const [enviosTo,   setEnviosTo]   = useState("");
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["cheques_devolvidos"],
@@ -130,7 +132,14 @@ export function DevolvidosManager() {
         toast.error("Nenhum lançamento no período selecionado");
         return;
       }
-      const blob = await buildDevolvidosWorkbook(filtered, { from: exportFrom, to: exportTo });
+      const enviosPeriod = (enviosFrom || enviosTo)
+        ? { from: enviosFrom || undefined, to: enviosTo || undefined }
+        : undefined;
+      const blob = await buildDevolvidosWorkbook(
+        filtered,
+        { from: exportFrom || undefined, to: exportTo || undefined },
+        enviosPeriod,
+      );
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       const today = new Date().toISOString().slice(0, 10);
@@ -311,34 +320,68 @@ export function DevolvidosManager() {
 
       {/* ── Painel de período para exportação ─────────────────────────────── */}
       {showExportForm && !exporting && (
-        <div className="rounded-xl border border-gold/30 bg-card p-4 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Período da análise
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-foreground">De</span>
-              <input
-                type="date"
-                value={exportFrom}
-                onChange={(e) => setExportFrom(e.target.value)}
-                className={inputCls}
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-foreground">Até</span>
-              <input
-                type="date"
-                value={exportTo}
-                onChange={(e) => setExportTo(e.target.value)}
-                className={inputCls}
-              />
-            </label>
+        <div className="rounded-xl border border-gold/30 bg-card p-4 space-y-4">
+
+          {/* Período dos devolvidos */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Período dos devolvidos
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block space-y-1">
+                <span className="text-xs text-muted-foreground">De</span>
+                <input
+                  type="date"
+                  value={exportFrom}
+                  onChange={(e) => setExportFrom(e.target.value)}
+                  className={inputCls}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs text-muted-foreground">Até</span>
+                <input
+                  type="date"
+                  value={exportTo}
+                  onChange={(e) => setExportTo(e.target.value)}
+                  className={inputCls}
+                />
+              </label>
+            </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Deixe em branco para incluir todos os registros.
-          </p>
-          <div className="flex justify-end gap-2">
+
+          <div className="border-t border-border/50" />
+
+          {/* Período dos envios (para correlação) */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Período dos envios — correlação
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Define quais notas enviadas entram na análise "Enviado × Devolvido". Deixe em branco para usar o mesmo período dos devolvidos.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block space-y-1">
+                <span className="text-xs text-muted-foreground">De</span>
+                <input
+                  type="date"
+                  value={enviosFrom}
+                  onChange={(e) => setEnviosFrom(e.target.value)}
+                  className={inputCls}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs text-muted-foreground">Até</span>
+                <input
+                  type="date"
+                  value={enviosTo}
+                  onChange={(e) => setEnviosTo(e.target.value)}
+                  className={inputCls}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={() => setShowExportForm(false)}

@@ -115,6 +115,7 @@ function periodLabel(period?: ExportPeriod): string {
 export async function buildDevolvidosWorkbook(
   rows: DevolvidoRow[],
   period?: ExportPeriod,
+  enviosPeriod?: ExportPeriod,
 ): Promise<Blob> {
   // @ts-ignore
   const ExcelJS: any = (await import("exceljs")).default;   // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -124,7 +125,9 @@ export async function buildDevolvidosWorkbook(
 
   const sorted = [...rows].sort((a, b) => b.data.localeCompare(a.data));
 
-  // ── Busca notas enviadas no mesmo período (para correlação) ───────────────
+  // ── Busca notas enviadas (período separado para correlação) ───────────────
+  // enviosPeriod tem prioridade; se não informado, usa o mesmo period dos devolvidos
+  const ep = enviosPeriod ?? period;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let notasQuery: any = supabase
     .from("notas_fiscais")
@@ -132,8 +135,8 @@ export async function buildDevolvidosWorkbook(
     .eq("status_envio", "ENVIADO")
     .not("cheque_enviado_em", "is", null);
 
-  if (period?.from) notasQuery = notasQuery.gte("cheque_enviado_em", period.from);
-  if (period?.to)   notasQuery = notasQuery.lte("cheque_enviado_em", period.to + "T23:59:59");
+  if (ep?.from) notasQuery = notasQuery.gte("cheque_enviado_em", ep.from);
+  if (ep?.to)   notasQuery = notasQuery.lte("cheque_enviado_em", ep.to + "T23:59:59");
 
   const { data: notasData } = await notasQuery;
   const notasEnviadas: { valor: number; cheque_enviado_em: string; fornecedor: string }[] =
@@ -287,7 +290,8 @@ export async function buildDevolvidosWorkbook(
 
   wsR.mergeCells("A2:J2");
   const rS = wsR.getCell("A2");
-  rS.value = `Exportado em ${todayBR}  ·  Período: ${periodLabel(period)}  ·  ${rows.length} lançamento${rows.length !== 1 ? "s" : ""}  ·  ${notasEnviadas.length} cheques enviados no período`;
+  const envPeriodStr = ep?.from || ep?.to ? periodLabel(ep) : "todos os registros";
+  rS.value = `Exportado em ${todayBR}  ·  Devolvidos: ${periodLabel(period)}  ·  Envios analisados: ${envPeriodStr}  ·  ${notasEnviadas.length} NFs enviadas`;
   rS.font  = { size: 9, italic: true, color: { argb: "FF8B949E" }, name: "Arial" };
   rS.fill  = fill(NAVY);
   rS.alignment = { vertical: "middle", horizontal: "center" };
@@ -556,7 +560,7 @@ export async function buildDevolvidosWorkbook(
 
   wsI.mergeCells("A2:J2");
   const iS = wsI.getCell("A2");
-  iS.value = `Taxa de inadimplência = Devolvido ÷ Enviado no mesmo mês  ·  Período: ${periodLabel(period)}  ·  ${crossDesc.length} meses com dados`;
+  iS.value = `Taxa de inadimplência = Devolvido ÷ Enviado no mesmo mês  ·  Devolvidos: ${periodLabel(period)}  ·  Envios: ${envPeriodStr}  ·  ${crossDesc.length} meses`;
   iS.font  = { size: 9, italic: true, color: { argb: "FF8B949E" }, name: "Arial" };
   iS.fill  = fill(NAVY);
   iS.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
