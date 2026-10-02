@@ -79,6 +79,10 @@ export function FluxoCaixaSection() {
   const [visao, setVisao] = useState<Visao>("periodo");
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [showExportForm, setShowExportForm] = useState(false);
+  const [expFrom, setExpFrom] = useState("");
+  const [expTo, setExpTo] = useState("");
+  const [expGranularidade, setExpGranularidade] = useState<Granularidade>("mes");
 
   const fx = useMemo(
     () => buildFluxo(caixa, notas, { from: from || undefined, to: to || undefined, granularidade }),
@@ -93,14 +97,60 @@ export function FluxoCaixaSection() {
       return next;
     });
 
+  const fxExport = useMemo(
+    () =>
+      showExportForm
+        ? buildFluxo(caixa, notas, {
+            from: expFrom || undefined,
+            to: expTo || undefined,
+            granularidade: expGranularidade,
+          })
+        : null,
+    [showExportForm, caixa, notas, expFrom, expTo, expGranularidade],
+  );
+
+  const abrirExportForm = () => {
+    if (showExportForm) {
+      setShowExportForm(false);
+      return;
+    }
+    // Começa com o que está filtrado na tela
+    setExpFrom(from);
+    setExpTo(to);
+    setExpGranularidade(granularidade);
+    setShowExportForm(true);
+  };
+
+  const aplicarAtalho = (atalho: "mes" | "mes_anterior" | "30d" | "ano") => {
+    const hoje = new Date();
+    const iso = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const y = hoje.getFullYear();
+    const m = hoje.getMonth();
+    if (atalho === "mes") {
+      setExpFrom(iso(new Date(y, m, 1)));
+      setExpTo(iso(new Date(y, m + 1, 0)));
+    } else if (atalho === "mes_anterior") {
+      setExpFrom(iso(new Date(y, m - 1, 1)));
+      setExpTo(iso(new Date(y, m, 0)));
+    } else if (atalho === "30d") {
+      setExpFrom(iso(new Date(y, m, hoje.getDate() - 29)));
+      setExpTo(iso(hoje));
+    } else {
+      setExpFrom(iso(new Date(y, 0, 1)));
+      setExpTo(iso(new Date(y, 11, 31)));
+    }
+  };
+
   const exportar = async () => {
-    if (!fx.movimentos.length) {
+    if (!fxExport?.movimentos.length) {
       toast.error("Nenhum movimento no período selecionado");
       return;
     }
+    setShowExportForm(false);
     setExporting(true);
     try {
-      const blob = await buildFluxoCaixaWorkbook(fx);
+      const blob = await buildFluxoCaixaWorkbook(fxExport);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -128,10 +178,14 @@ export function FluxoCaixaSection() {
           <div className="text-sm font-semibold text-foreground">Fluxo de caixa</div>
           <button
             type="button"
-            onClick={exportar}
+            onClick={abrirExportForm}
             disabled={exporting || !caixa.length}
-            title="Exportar planilha Excel do fluxo de caixa"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground transition-colors hover:border-gold/40 hover:text-gold disabled:opacity-40"
+            title="Exportar planilha Excel do fluxo de caixa (DFC)"
+            className={`inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
+              showExportForm
+                ? "border-gold/60 text-gold"
+                : "border-border text-soft-foreground hover:border-gold/40 hover:text-gold"
+            }`}
           >
             {exporting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -141,6 +195,109 @@ export function FluxoCaixaSection() {
             {exporting ? "Gerando…" : "Exportar Excel"}
           </button>
         </div>
+
+        {/* ── Painel de período para exportação ─────────────────────────────── */}
+        {showExportForm && !exporting && fxExport && (
+          <div className="space-y-4 rounded-xl border border-gold/30 bg-surface/40 p-4">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Período da DFC
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["mes", "Este mês"],
+                    ["mes_anterior", "Mês passado"],
+                    ["30d", "Últimos 30 dias"],
+                    ["ano", "Este ano"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => aplicarAtalho(id)}
+                    className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-soft-foreground hover:border-gold/40 hover:text-gold"
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpFrom("");
+                    setExpTo("");
+                  }}
+                  className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-soft-foreground hover:border-gold/40 hover:text-gold"
+                >
+                  Tudo
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                <label className="block space-y-1">
+                  <span className="text-xs text-muted-foreground">De</span>
+                  <input
+                    type="date"
+                    value={expFrom}
+                    onChange={(e) => setExpFrom(e.target.value)}
+                    className={inputCls}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs text-muted-foreground">Até</span>
+                  <input
+                    type="date"
+                    value={expTo}
+                    onChange={(e) => setExpTo(e.target.value)}
+                    className={inputCls}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-border/50" />
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Colunas da DFC
+              </p>
+              <Segmented
+                value={expGranularidade}
+                onChange={setExpGranularidade}
+                options={[
+                  { id: "dia", label: "Por dia" },
+                  { id: "semana", label: "Por semana" },
+                  { id: "mes", label: "Por mês" },
+                ]}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="text-xs text-soft-foreground">
+                {fxExport.movimentos.length} movimento{fxExport.movimentos.length === 1 ? "" : "s"}{" "}
+                · {fxExport.periodos.length} coluna{fxExport.periodos.length === 1 ? "" : "s"} ·
+                saldo {brl(fxExport.totais.saldoInicial)} → {brl(fxExport.totais.saldoFinal)}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExportForm(false)}
+                  className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-soft-foreground transition-colors hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={exportar}
+                  disabled={fxExport.movimentos.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-xs font-bold text-background transition-colors hover:bg-gold/90 disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Gerar planilha
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="grid w-full grid-cols-2 gap-3 sm:w-auto">

@@ -203,6 +203,180 @@ function buildResumoSheet(wb: AW, fx: Fluxo, geradoEm: string) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+//  ABA DFC — Demonstração do Fluxo de Caixa (períodos em colunas)
+// ══════════════════════════════════════════════════════════════════════════════
+function buildDfcSheet(wb: AW, fx: Fluxo) {
+  const nPer = fx.periodos.length;
+  const totalCol = nPer + 2;
+  const ws: AW = wb.addWorksheet("DFC", {
+    views: [{ state: "frozen", xSplit: 1, ySplit: 4, showGridLines: false }],
+  });
+  ws.columns = [{ width: 38 }, ...fx.periodos.map(() => ({ width: 16 })), { width: 18 }];
+  const L = (c: number) => ws.getColumn(c).letter as string;
+  const lastL = L(totalCol);
+
+  titulo(
+    ws,
+    `A1:${lastL}1`,
+    "DEMONSTRAÇÃO DO FLUXO DE CAIXA DE CHEQUES",
+    `Período: ${periodoLabel(fx.filtro)}  ·  Colunas: ${GRAN_LABEL[fx.filtro.granularidade]}`,
+  );
+
+  // Cabeçalho
+  hdr(ws.getCell(4, 1), "Demonstração", NAVY, "left");
+  fx.periodos.forEach((p, i) => hdr(ws.getCell(4, i + 2), p.label, NAVY));
+  hdr(ws.getCell(4, totalCol), "Total do período", TEL_H);
+  ws.getRow(4).height = 30;
+
+  // Fornecedor de cada saída (mesmo agrupamento da aba Por Fornecedor)
+  const fornDoMov = new Map<string, number>();
+  fx.fornecedores.forEach((f, fi) => f.movimentos.forEach((m) => fornDoMov.set(m.id, fi)));
+
+  let r = 5;
+  const secao = (text: string, bg: string) => {
+    ws.mergeCells(r, 1, r, totalCol);
+    hdr(ws.getCell(r, 1), text, bg, "left");
+    ws.getRow(r).height = 18;
+    r++;
+  };
+
+  /** Linha de valores; Total = soma das colunas (fórmula). */
+  const linhaValores = (label: string, valores: number[], color: string, zi: number) => {
+    const bg = zebra(zi);
+    dat(ws.getCell(r, 1), label, undefined, INK, bg, "left");
+    valores.forEach((v, i) => dat(ws.getCell(r, i + 2), v || null, BRL, color, bg, "right"));
+    const total = valores.reduce((s, v) => s + v, 0);
+    dat(
+      ws.getCell(r, totalCol),
+      { formula: `SUM(B${r}:${L(nPer + 1)}${r})`, result: total },
+      BRL,
+      color,
+      bg,
+      "right",
+      true,
+    );
+    ws.getRow(r).height = 17;
+    return r++;
+  };
+
+  /** Linha de subtotal/resultado com fórmula por coluna. */
+  const linhaFormula = (
+    label: string,
+    formula: (col: string) => string,
+    results: number[],
+    totalFormula: string,
+    totalResult: number,
+    bg: string,
+    fmt = BRL,
+  ) => {
+    hdr(ws.getCell(r, 1), label, bg, "left");
+    results.forEach((v, i) => {
+      const c = ws.getCell(r, i + 2);
+      hdr(c, "", bg, "right");
+      c.value = { formula: formula(L(i + 2)), result: v };
+      c.numFmt = fmt;
+    });
+    const ct = ws.getCell(r, totalCol);
+    hdr(ct, "", bg, "right");
+    ct.value = { formula: totalFormula, result: totalResult };
+    ct.numFmt = fmt;
+    ws.getRow(r).height = 19;
+    return r++;
+  };
+
+  const ini = fx.periodos.map((p) => p.saldoInicial);
+  const ent = fx.periodos.map((p) => p.entradas);
+  const sai = fx.periodos.map((p) => p.saidas);
+  const t = fx.totais;
+
+  // Saldo inicial: 1ª coluna = valor; demais = saldo final da coluna anterior
+  const rIni = r;
+  r++;
+  r++; // espaço
+
+  secao("(+) ENTRADAS", GRN_H);
+  const rEnt0 = linhaValores("Cheques recebidos", ent, GRN_T, 0);
+  const rEntTot = linhaFormula(
+    "(=) Total de entradas",
+    (c) => `SUM(${c}${rEnt0}:${c}${rEnt0})`,
+    ent,
+    `SUM(${L(totalCol)}${rEnt0}:${L(totalCol)}${rEnt0})`,
+    t.entradas,
+    GRN_H,
+  );
+  r++;
+
+  secao("(−) SAÍDAS — CHEQUES ENVIADOS A FORNECEDORES", RED_H);
+  const rSai0 = r;
+  fx.fornecedores.forEach((f, fi) => {
+    const vals = fx.periodos.map((p) =>
+      p.movimentos.reduce(
+        (s, m) => (m.saida > 0 && fornDoMov.get(m.id) === fi ? s + m.saida : s),
+        0,
+      ),
+    );
+    linhaValores(f.fornecedor, vals, RED_T, fi);
+  });
+  const rSai1 = r - 1;
+  const somaSai = (c: string) => (rSai1 >= rSai0 ? `SUM(${c}${rSai0}:${c}${rSai1})` : "0");
+  const rSaiTot = linhaFormula(
+    "(=) Total de saídas",
+    somaSai,
+    sai,
+    somaSai(L(totalCol)),
+    t.saidas,
+    RED_H,
+  );
+  r++;
+
+  const rVar = linhaFormula(
+    "(=) VARIAÇÃO LÍQUIDA DO CAIXA",
+    (c) => `${c}${rEntTot}-${c}${rSaiTot}`,
+    fx.periodos.map((p) => p.entradas - p.saidas),
+    `${L(totalCol)}${rEntTot}-${L(totalCol)}${rSaiTot}`,
+    t.entradas - t.saidas,
+    TEL_H,
+    DELT,
+  );
+  r++;
+
+  const rFim = linhaFormula(
+    "SALDO FINAL DO CAIXA",
+    (c) => `${c}${rIni}+${c}${rVar}`,
+    fx.periodos.map((p) => p.saldoFinal),
+    `${L(totalCol)}${rIni}+${L(totalCol)}${rVar}`,
+    t.saldoFinal,
+    NAVY,
+  );
+
+  // Preenche o saldo inicial agora que sabemos a linha do saldo final
+  {
+    const save = r;
+    r = rIni;
+    linhaFormula(
+      "SALDO INICIAL DO CAIXA",
+      (c) => (c === "B" ? String(ini[0] ?? 0) : `${L(ws.getColumn(c).number - 1)}${rFim}`),
+      ini,
+      `B${rIni}`,
+      t.saldoInicial,
+      NAVY,
+    );
+    r = save;
+  }
+  ws.getCell(rIni, 2).value = ini[0] ?? 0;
+  ws.getCell(rFim, 1).font = { bold: true, size: 10, color: { argb: GOLD }, name: "Arial" };
+  ws.getCell(rIni, 1).font = { bold: true, size: 10, color: { argb: GOLD }, name: "Arial" };
+
+  // Nota
+  r += 2;
+  ws.mergeCells(r, 1, r, Math.min(totalCol, 6));
+  const nota = ws.getCell(r, 1);
+  nota.value =
+    "Saldo inicial de cada coluna = saldo final da coluna anterior. Totais e saldos são fórmulas — confira à vontade.";
+  nota.font = { italic: true, size: 8, color: { argb: GRAY_T }, name: "Arial" };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 //  ABA 2 — Fluxo por período
 // ══════════════════════════════════════════════════════════════════════════════
 function buildPeriodoSheet(wb: AW, fx: Fluxo) {
@@ -451,6 +625,7 @@ export async function buildFluxoCaixaWorkbook(fx: Fluxo): Promise<Blob> {
   const now = new Date();
   const geradoEm = now.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
+  buildDfcSheet(wb, fx);
   buildResumoSheet(wb, fx, geradoEm);
   buildPeriodoSheet(wb, fx);
   buildMovimentosSheet(wb, fx);
