@@ -119,15 +119,21 @@ export function DevolvidosManager() {
   }, [editingId, rows]);
 
   // ── Excel export ────────────────────────────────────────────────────────
+  const exportRows = useMemo(
+    () =>
+      rows.filter((r) => {
+        if (exportFrom && r.data < exportFrom) return false;
+        if (exportTo   && r.data > exportTo)   return false;
+        return true;
+      }),
+    [rows, exportFrom, exportTo],
+  );
+
   const exportToExcel = async () => {
     setShowExportForm(false);
     setExporting(true);
     try {
-      const filtered = rows.filter((r) => {
-        if (exportFrom && r.data < exportFrom) return false;
-        if (exportTo   && r.data > exportTo)   return false;
-        return true;
-      });
+      const filtered = exportRows;
       if (filtered.length === 0) {
         toast.error("Nenhum lançamento no período selecionado");
         return;
@@ -392,10 +398,11 @@ export function DevolvidosManager() {
             <button
               type="button"
               onClick={exportToExcel}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-xs font-bold text-background hover:bg-gold/90 transition-colors"
+              disabled={exportRows.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-xs font-bold text-background hover:bg-gold/90 transition-colors disabled:opacity-50"
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
-              Gerar planilha
+              Gerar planilha ({exportRows.length})
             </button>
           </div>
         </div>
@@ -540,7 +547,7 @@ export function DevolvidosManager() {
 
       {/* ── Tabela: mês atual (detalhe) ──────────────────────────────────── */}
       <EntriesTable
-        title={`Lançamentos de ${fmtMonthBR(currentYM)}`}
+        title={`Lançamentos de ${fmtMonthBR(currentYM)} · ${monthRows.length} ${monthRows.length === 1 ? "registro" : "registros"}`}
         rows={monthRows}
         isLoading={isLoading}
         editingId={editingId}
@@ -551,7 +558,7 @@ export function DevolvidosManager() {
       {/* ── Tabela: meses anteriores (detalhe individual) ────────────────── */}
       {prevRows.length > 0 && (
         <EntriesTable
-          title="Histórico — meses anteriores"
+          title={`Histórico — meses anteriores · ${prevRows.length} ${prevRows.length === 1 ? "registro" : "registros"}`}
           rows={prevRows}
           isLoading={false}
           editingId={editingId}
