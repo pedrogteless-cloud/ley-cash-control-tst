@@ -240,6 +240,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      resumo_diario_status: { Args: never; Returns: Json }
+      send_daily_cheques_table: { Args: never; Returns: Json }
       send_status_telegram: {
         Args: {
           p_carteira_notas: number
@@ -250,6 +252,7 @@ export type Database = {
         Returns: Json
       }
       separar_nf: { Args: { p_nf_id: string }; Returns: Json }
+      set_resumo_diario_ativo: { Args: { p_ativo: boolean }; Returns: Json }
       update_devolvido: {
         Args: {
           p_data: string

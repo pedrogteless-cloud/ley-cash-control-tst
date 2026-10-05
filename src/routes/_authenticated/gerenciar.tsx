@@ -11,6 +11,7 @@ import { listTeam, setRole, createTeamMember } from "@/lib/api/roles.functions";
 import { useRoles } from "@/hooks/use-role";
 import { supabase } from "@/integrations/supabase/client";
 import { DevolvidosManager } from "@/components/painel/DevolvidosManager";
+import { TelegramResumoManager } from "@/components/painel/TelegramResumoManager";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/_authenticated/gerenciar")({
   component: GerenciarPage,
 });
 
-type Tab = "nfs" | "caixa" | "devolvidos" | "time" | "auditoria";
+type Tab = "nfs" | "caixa" | "devolvidos" | "time" | "auditoria" | "telegram";
 
 function GerenciarPage() {
   const { isAdmin, roles } = useRoles();
@@ -60,6 +61,7 @@ function GerenciarPage() {
             ...(canSeeDevolvidos ? [{ id: "devolvidos" as const, label: "Devolvidos" }] : []),
             ...(isAdmin ? [{ id: "time" as const, label: "Time" }] : []),
             ...(isAdmin ? [{ id: "auditoria" as const, label: "Auditoria" }] : []),
+            ...(isAdmin ? [{ id: "telegram" as const, label: "Telegram" }] : []),
           ] as { id: Tab; label: string }[]).map((t) => (
             <button
               key={t.id}
@@ -82,6 +84,7 @@ function GerenciarPage() {
         {tab === "devolvidos" && canSeeDevolvidos && <DevolvidosManager />}
         {tab === "time" && isAdmin && <TeamManager />}
         {tab === "auditoria" && isAdmin && <AuditoriaManager />}
+        {tab === "telegram" && isAdmin && <TelegramResumoManager />}
       </main>
     </div>
   );

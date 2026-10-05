@@ -41,6 +41,21 @@ async function sendTelegram(text: string) {
   return { ok: res.ok, data };
 }
 
+async function sendTelegramPhoto(photo: string, caption: string) {
+  if (!TOKEN || !CHAT_ID) {
+    console.error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID");
+    return { ok: false, error: "missing_env" };
+  }
+  const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: CHAT_ID, photo, caption }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) console.error("Telegram sendPhoto error:", res.status, data);
+  return { ok: res.ok, data };
+}
+
 async function sendTelegramOrThrow(text: string) {
   const result = await sendTelegram(text);
   if (!result.ok) {
@@ -55,10 +70,45 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const serverOriginated = payload?.type === "devolvido_atualizado" || typeof payload?.table === "string";
+    const serverOriginated =
+      payload?.type === "devolvido_atualizado" ||
+      payload?.type === "resumo_tabela_png" ||
+      typeof payload?.table === "string";
     if (serverOriginated && WEBHOOK_SECRET && req.headers.get("x-telegram-secret") !== WEBHOOK_SECRET) {
       return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
         status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ============ Resumo do dia em imagem (send_daily_cheques_table, via pg_net) ============
+    if (payload?.type === "resumo_tabela_png") {
+      // Exige o segredo mesmo se TELEGRAM_WEBHOOK_SECRET não estiver definido
+      if (!WEBHOOK_SECRET || req.headers.get("x-telegram-secret") !== WEBHOOK_SECRET) {
+        return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const photo = String(payload?.photo_url ?? "");
+      const caption = String(payload?.caption ?? "").slice(0, 1024);
+      // Só envia imagens geradas pela função tabela-png
+      let photoOk = false;
+      try {
+        const u = new URL(photo);
+        photoOk = u.protocol === "https:" && u.pathname === "/functions/v1/tabela-png" && u.searchParams.has("d");
+      } catch {
+        photoOk = false;
+      }
+      if (!photoOk) {
+        return new Response(JSON.stringify({ ok: false, error: "invalid_photo_url" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const result = await sendTelegramPhoto(photo, caption);
+      return new Response(JSON.stringify({ ok: result.ok, telegram: result.data ?? result.error }), {
+        status: result.ok ? 200 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

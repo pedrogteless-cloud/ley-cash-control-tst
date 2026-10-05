@@ -2,3 +2,6 @@ project_id = "otcjduyietrmrcsisymx"
 
 [functions.telegram-notify]
 verify_jwt = false
+
+[functions.tabela-png]
+verify_jwt = false
