@@ -326,7 +326,7 @@ export function DevolvidosManager() {
 
       {/* ── Painel de período para exportação ─────────────────────────────── */}
       {showExportForm && !exporting && (
-        <div className="rounded-xl border border-gold/30 bg-card p-4 space-y-4">
+        <div className="rounded-lg border border-gold/30 bg-card p-4 space-y-4">
 
           {/* Período dos devolvidos */}
           <div className="space-y-2">
@@ -411,7 +411,7 @@ export function DevolvidosManager() {
       {/* ── Form ─────────────────────────────────────────────────────────── */}
       <form
         onSubmit={handleSubmit}
-        className={`rounded-xl border p-4 space-y-4 ${
+        className={`rounded-lg border p-4 space-y-4 ${
           editingId ? "border-blue/40 bg-card" : "border-gold/40 bg-card"
         }`}
       >
@@ -592,13 +592,13 @@ export function DevolvidosManager() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="active:scale-95 transition-transform">
+            <AlertDialogCancel className="transition-transform">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
               disabled={deleteMut.isPending}
-              className="bg-red text-background hover:bg-red/90 active:scale-95 transition-transform disabled:opacity-50"
+              className="bg-red text-background hover:bg-red/90 transition-transform disabled:opacity-50"
             >
               {deleteMut.isPending ? "Excluindo..." : "Excluir"}
             </AlertDialogAction>
@@ -627,7 +627,7 @@ function EntriesTable({
   onDelete: (r: Row) => void;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card">
+    <div className="rounded-lg border border-border bg-card">
       <div className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </div>
@@ -635,11 +635,11 @@ function EntriesTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3 font-medium">Data</th>
-              <th className="px-4 py-3 text-right font-medium">Voltou</th>
-              <th className="px-4 py-3 text-right font-medium">Recuperado</th>
-              <th className="px-4 py-3 text-right font-medium">Pendente</th>
-              <th className="px-4 py-3 text-right font-medium">Ações</th>
+              <th className="px-3 py-2 font-medium">Data</th>
+              <th className="px-3 py-2 text-right font-medium">Voltou</th>
+              <th className="px-3 py-2 text-right font-medium">Recuperado</th>
+              <th className="px-3 py-2 text-right font-medium">Pendente</th>
+              <th className="px-3 py-2 text-right font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -662,7 +662,7 @@ function EntriesTable({
                         : "hover:bg-surface/50"
                   }`}
                 >
-                  <td className="px-4 py-3 font-semibold text-foreground">
+                  <td className="px-3 py-1.5 font-semibold text-foreground">
                     <div>{fmtDateBR(r.data)}</div>
                     {recuperacaoAvulsa && (
                       <div className="mt-0.5 text-[11px] font-medium text-blue">
@@ -670,21 +670,21 @@ function EntriesTable({
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-red">
+                  <td className="px-3 py-1.5 text-right font-semibold text-red">
                     {devolvido > 0 ? (
                       brl(devolvido)
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right text-blue">
+                  <td className="px-3 py-1.5 text-right text-blue">
                     {recuperado > 0 ? (
                       brl(recuperado)
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right font-bold">
+                  <td className="px-3 py-1.5 text-right font-bold">
                     {recuperacaoAvulsa ? (
                       <span className="text-muted-foreground">—</span>
                     ) : quitado ? (
@@ -695,7 +695,7 @@ function EntriesTable({
                       <span className="text-gold">{brl(pend)}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-1.5">
                     <div className="flex justify-end gap-1">
                       <button
                         onClick={() => onEdit(r)}
@@ -738,7 +738,7 @@ function isRecoveryOnly(r: Row) {
 
 function KpiBox({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </div>

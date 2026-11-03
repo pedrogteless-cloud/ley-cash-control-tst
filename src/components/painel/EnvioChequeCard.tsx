@@ -64,7 +64,7 @@ export function EnvioChequeFornecedorCard({
   };
 
   return (
-    <div className="rounded-xl border border-blue/35 bg-card">
+    <div className="rounded-lg border border-blue/35 bg-card">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
@@ -73,7 +73,7 @@ export function EnvioChequeFornecedorCard({
         <div className="flex min-w-0 items-center gap-2">
           <PackageCheck className="h-4 w-4 shrink-0 text-blue" />
           <span className="truncate text-sm font-semibold text-foreground">{fornecedor}</span>
-          <span className="rounded-full bg-blue-dim px-2 py-0.5 text-[11px] font-bold text-blue">
+          <span className="rounded bg-blue-dim px-2 py-0.5 text-[11px] font-bold text-blue">
             {nfs.length} NF{nfs.length > 1 ? "s" : ""}
           </span>
         </div>
@@ -133,7 +133,7 @@ export function EnvioChequeFornecedorCard({
             type="button"
             onClick={handleEnviar}
             disabled={isEnviando || selectedCount === 0 || valorFinal <= 0}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-green px-3 py-2.5 text-sm font-bold text-background transition-all hover:bg-green/90 active:scale-95 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-green px-3 py-2.5 text-sm font-bold text-background transition-colors hover:bg-green/90 disabled:opacity-60"
           >
             {isEnviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             {isEnviando ? "Registrando..." : "Registrar saída de cheque"}

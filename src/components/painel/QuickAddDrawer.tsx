@@ -429,14 +429,14 @@ function FooterButtons({ saving, onCancel }: { saving: boolean; onCancel: () => 
       <button
         type="button"
         onClick={onCancel}
-        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-semibold text-soft-foreground transition-transform transition-colors duration-150 hover:text-foreground active:scale-95"
+        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-semibold text-soft-foreground transition-transform transition-colors duration-150 hover:text-foreground"
       >
         <X className="h-4 w-4" /> Cancelar
       </button>
       <button
         type="submit"
         disabled={saving}
-        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold px-3 py-3 text-sm font-bold text-background transition-transform transition-colors duration-150 hover:bg-gold/90 active:scale-95 disabled:opacity-50"
+        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold px-3 py-3 text-sm font-bold text-background transition-transform transition-colors duration-150 hover:bg-gold/90 disabled:opacity-50"
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{" "}
         {saving ? "Salvando..." : "Salvar"}

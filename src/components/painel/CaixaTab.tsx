@@ -35,7 +35,7 @@ export function CaixaTab({
 
   if (!caixa.length) {
     return (
-      <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+      <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
         Nenhum movimento de caixa cadastrado.
       </div>
     );
@@ -95,27 +95,27 @@ export function CaixaTab({
 
       {/* Charts - desktop só */}
       <div className="hidden lg:block space-y-6">
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-lg border border-border bg-card p-4">
           <div className="mb-3 text-sm font-semibold text-foreground">Evolução do caixa</div>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={lineData}>
-              <CartesianGrid stroke="#2D3748" vertical={false} />
-              <XAxis dataKey="data" stroke="#8B949E" tick={{ fontSize: 11 }} />
+              <CartesianGrid stroke="#cfe3f7" vertical={false} />
+              <XAxis dataKey="data" stroke="#5b6e8c" tick={{ fontSize: 11 }} />
               <YAxis
-                stroke="#8B949E"
+                stroke="#5b6e8c"
                 tick={{ fontSize: 11 }}
                 tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
               />
               <Tooltip
                 contentStyle={{
-                  background: "#1C2330",
-                  border: "1px solid #2D3748",
-                  borderRadius: 12,
-                  color: "#E6EDF3",
+                  background: "#ffffff",
+                  border: "1px solid #cfe3f7",
+                  borderRadius: 6,
+                  color: "#15305c",
                 }}
                 formatter={(v: number) => brl(v)}
               />
-              <Legend wrapperStyle={{ fontSize: 12, color: "#C9D1D9" }} />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#3d5170" }} />
               <Line
                 type="monotone"
                 dataKey="Saldo"
@@ -126,7 +126,7 @@ export function CaixaTab({
               <Line
                 type="monotone"
                 dataKey="Entrada"
-                stroke="#58A6FF"
+                stroke="#4aa3ef"
                 strokeWidth={2}
                 dot={{ r: 3 }}
               />
@@ -141,48 +141,48 @@ export function CaixaTab({
           </ResponsiveContainer>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-lg border border-border bg-card p-4">
           <div className="mb-3 text-sm font-semibold text-foreground">Saldo vs Carteira</div>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={compareData}>
-              <CartesianGrid stroke="#2D3748" vertical={false} />
-              <XAxis dataKey="data" stroke="#8B949E" tick={{ fontSize: 11 }} />
+              <CartesianGrid stroke="#cfe3f7" vertical={false} />
+              <XAxis dataKey="data" stroke="#5b6e8c" tick={{ fontSize: 11 }} />
               <YAxis
-                stroke="#8B949E"
+                stroke="#5b6e8c"
                 tick={{ fontSize: 11 }}
                 tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
               />
               <Tooltip
                 contentStyle={{
-                  background: "#1C2330",
-                  border: "1px solid #2D3748",
-                  borderRadius: 12,
-                  color: "#E6EDF3",
+                  background: "#ffffff",
+                  border: "1px solid #cfe3f7",
+                  borderRadius: 6,
+                  color: "#15305c",
                 }}
                 formatter={(v: number) => brl(v)}
               />
-              <Legend wrapperStyle={{ fontSize: 12, color: "#C9D1D9" }} />
-              <Bar dataKey="Saldo em casa" fill="#3DDC84" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="Carteira NFs" fill="#F0B429" radius={[6, 6, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#3d5170" }} />
+              <Bar dataKey="Saldo em casa" fill="#3DDC84" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Carteira NFs" fill="#0d3d7a" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Mini chart no mobile */}
-      <div className="lg:hidden rounded-xl border border-border bg-card p-4">
+      <div className="lg:hidden rounded-lg border border-border bg-card p-4">
         <div className="mb-3 text-sm font-semibold text-foreground">Evolução do saldo</div>
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={lineData}>
-            <CartesianGrid stroke="#2D3748" vertical={false} />
-            <XAxis dataKey="data" stroke="#8B949E" tick={{ fontSize: 10 }} />
+            <CartesianGrid stroke="#cfe3f7" vertical={false} />
+            <XAxis dataKey="data" stroke="#5b6e8c" tick={{ fontSize: 10 }} />
             <YAxis hide />
             <Tooltip
               contentStyle={{
-                background: "#1C2330",
-                border: "1px solid #2D3748",
-                borderRadius: 12,
-                color: "#E6EDF3",
+                background: "#ffffff",
+                border: "1px solid #cfe3f7",
+                borderRadius: 6,
+                color: "#15305c",
               }}
               formatter={(v: number) => brl(v)}
             />
@@ -213,7 +213,7 @@ export function CaixaTab({
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-card">
+        <div className="rounded-lg border border-border bg-card">
           <div className="border-b border-border p-4 text-sm font-semibold text-foreground">
             Histórico do caixa
           </div>
@@ -221,12 +221,12 @@ export function CaixaTab({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Data</th>
-                  <th className="px-4 py-3 text-right font-medium">Saldo Anterior</th>
-                  <th className="px-4 py-3 text-right font-medium">Entrada</th>
-                  <th className="px-4 py-3 text-right font-medium">Saída</th>
-                  <th className="px-4 py-3 text-right font-medium">Saldo Total</th>
-                  <th className="px-4 py-3 font-medium">Destino</th>
+                  <th className="px-3 py-2 font-medium">Data</th>
+                  <th className="px-3 py-2 text-right font-medium">Saldo Anterior</th>
+                  <th className="px-3 py-2 text-right font-medium">Entrada</th>
+                  <th className="px-3 py-2 text-right font-medium">Saída</th>
+                  <th className="px-3 py-2 text-right font-medium">Saldo Total</th>
+                  <th className="px-3 py-2 font-medium">Destino</th>
                 </tr>
               </thead>
               <tbody>
@@ -235,20 +235,20 @@ export function CaixaTab({
                     key={c.id}
                     className="border-b border-border/50 last:border-0 hover:bg-surface/50"
                   >
-                    <td className="px-4 py-3 font-semibold text-foreground">{c.data}</td>
-                    <td className="px-4 py-3 text-right text-soft-foreground">
+                    <td className="px-3 py-1.5 font-semibold text-foreground">{c.data}</td>
+                    <td className="px-3 py-1.5 text-right text-soft-foreground">
                       {brl(c.saldoAnterior)}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-blue">
+                    <td className="px-3 py-1.5 text-right font-semibold text-blue">
                       {c.entrada > 0 ? brl(c.entrada) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-red">
+                    <td className="px-3 py-1.5 text-right font-semibold text-red">
                       {c.saida > 0 ? brl(c.saida) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-green">
+                    <td className="px-3 py-1.5 text-right font-bold text-green">
                       {brl(c.saldoTotal)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{c.destino ?? "—"}</td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">{c.destino ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

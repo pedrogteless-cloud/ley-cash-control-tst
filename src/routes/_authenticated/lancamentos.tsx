@@ -1,3 +1,4 @@
+import { LeyLogo } from "@/components/LeyLogo";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, ArrowLeft, LogOut, Pencil, Trash2, Inbox, CheckCircle2, Send, Search, PackageCheck } from "lucide-react";
@@ -133,7 +134,7 @@ function Lancamentos() {
 
   return (
     <div className="min-h-screen bg-background pb-24 sm:pb-0">
-      <header className="header-gradient sticky top-0 z-40 border-b border-border">
+      <header className="bg-surface sticky top-0 z-40 border-b-2 border-b-[#4aa3ef]">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center justify-between gap-3">
             <Link
@@ -142,9 +143,7 @@ function Lancamentos() {
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Painel
             </Link>
-            <div className="text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">
-              ◆ Lançar
-            </div>
+            <LeyLogo className="h-8" />
             <button
               onClick={() => supabase.auth.signOut()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-soft-foreground hover:text-red hover:border-red/40 transition-colors"
@@ -160,7 +159,7 @@ function Lancamentos() {
             <TodayCounter nfs={nfsHoje.length} cx={caixaHoje.length} />
           </div>
 
-          <div className="mt-4 inline-flex rounded-xl border border-border bg-surface p-1">
+          <div className="mt-4 inline-flex rounded-lg border border-border bg-surface p-1">
             {showCarteira && (
               <button
                 onClick={() => setTab("carteira")}
@@ -239,7 +238,7 @@ function Lancamentos() {
                     <button
                       key={f}
                       onClick={() => setNfFilter(f)}
-                      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-transform transition-colors duration-150 active:scale-95 ${
+                      className={`shrink-0 rounded px-3 py-1.5 text-xs font-semibold transition-transform transition-colors duration-150 ${
                         nfFilter === f ? "bg-gold text-background" : "bg-surface text-soft-foreground hover:bg-border/40"
                       }`}
                     >
@@ -306,7 +305,7 @@ function Lancamentos() {
 
       <button
         onClick={openFab}
-        className="fixed bottom-6 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gold text-background shadow-lg shadow-gold/30 transition-transform transition-colors duration-150 hover:bg-gold/90 active:scale-95 sm:right-6"
+        className="fixed bottom-6 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded bg-gold text-background shadow-lg shadow-gold/30 transition-transform transition-colors duration-150 hover:bg-gold/90 sm:right-6"
         aria-label="Novo lançamento"
       >
         <Plus className="h-6 w-6" />
@@ -340,13 +339,13 @@ function Lancamentos() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="active:scale-95 transition-transform">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="transition-transform">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleteNfTarget) removeNota(deleteNfTarget.id);
                 setDeleteNfTarget(null);
               }}
-              className="bg-red text-background hover:bg-red/90 active:scale-95 transition-transform"
+              className="bg-red text-background hover:bg-red/90 transition-transform"
             >
               Excluir mesmo assim
             </AlertDialogAction>
@@ -370,13 +369,13 @@ function Lancamentos() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="active:scale-95 transition-transform">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="transition-transform">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleteCaixaTarget) removeCaixa(deleteCaixaTarget.id);
                 setDeleteCaixaTarget(null);
               }}
-              className="bg-red text-background hover:bg-red/90 active:scale-95 transition-transform"
+              className="bg-red text-background hover:bg-red/90 transition-transform"
             >
               Excluir
             </AlertDialogAction>
@@ -407,7 +406,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 
 function EmptyBox({ text }: { text: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/40 px-4 py-12 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card/40 px-4 py-12 text-center">
       <Inbox className="h-8 w-8 text-muted-foreground" />
       <p className="max-w-xs text-sm text-soft-foreground">{text}</p>
     </div>
@@ -468,7 +467,7 @@ function NfRow({
   const separado = isSeparado(n);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-3">
+    <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -510,14 +509,14 @@ function NfRow({
       <div className="mt-3 flex flex-wrap items-center justify-end gap-1 border-t border-border/60 pt-2">
         <button
           onClick={onEdit}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-blue transition-transform transition-colors duration-150 hover:bg-blue-dim active:scale-95"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-blue transition-transform transition-colors duration-150 hover:bg-blue-dim"
           aria-label="Editar"
         >
           <Pencil className="h-3.5 w-3.5" /> Editar
         </button>
         <button
           onClick={onDelete}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-red transition-transform transition-colors duration-150 hover:bg-red-dim active:scale-95"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-red transition-transform transition-colors duration-150 hover:bg-red-dim"
           aria-label="Excluir"
         >
           <Trash2 className="h-3.5 w-3.5" /> Excluir
@@ -541,7 +540,7 @@ function CaixaRow({
   const valor = c.entrada > 0 ? c.entrada : c.saida;
   const tone = c.entrada > 0 ? "text-blue" : "text-red";
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
           {c.createdAt && <><span>{timeLabel(c.createdAt)}</span><span>·</span></>}
@@ -564,14 +563,14 @@ function CaixaRow({
         <div className="flex gap-1">
           <button
             onClick={onEdit}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-blue transition-transform transition-colors duration-150 hover:bg-blue-dim active:scale-95"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-blue transition-transform transition-colors duration-150 hover:bg-blue-dim"
             aria-label="Editar"
           >
             <Pencil className="h-4 w-4" />
           </button>
           <button
             onClick={onDelete}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-red transition-transform transition-colors duration-150 hover:bg-red-dim active:scale-95"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-red transition-transform transition-colors duration-150 hover:bg-red-dim"
             aria-label="Excluir"
           >
             <Trash2 className="h-4 w-4" />

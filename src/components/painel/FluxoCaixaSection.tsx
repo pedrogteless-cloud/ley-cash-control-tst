@@ -171,7 +171,7 @@ export function FluxoCaixaSection() {
   const periodos = [...fx.periodos].reverse();
 
   return (
-    <div className="rounded-xl border border-border bg-card">
+    <div className="rounded-lg border border-border bg-card">
       {/* Cabeçalho + filtros */}
       <div className="space-y-3 border-b border-border p-4">
         <div className="flex items-center justify-between gap-3">
@@ -198,7 +198,7 @@ export function FluxoCaixaSection() {
 
         {/* ── Painel de período para exportação ─────────────────────────────── */}
         {showExportForm && !exporting && fxExport && (
-          <div className="space-y-4 rounded-xl border border-gold/30 bg-surface/40 p-4">
+          <div className="space-y-4 rounded-lg border border-gold/30 bg-surface/40 p-4">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Período da DFC
@@ -410,13 +410,13 @@ export function FluxoCaixaSection() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Período</th>
+                <th className="px-3 py-2 font-medium">Período</th>
                 <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">
                   Saldo inicial
                 </th>
-                <th className="px-4 py-3 text-right font-medium">Entradas</th>
-                <th className="px-4 py-3 text-right font-medium">Saídas</th>
-                <th className="px-4 py-3 text-right font-medium">Saldo final</th>
+                <th className="px-3 py-2 text-right font-medium">Entradas</th>
+                <th className="px-3 py-2 text-right font-medium">Saídas</th>
+                <th className="px-3 py-2 text-right font-medium">Saldo final</th>
               </tr>
             </thead>
             <tbody>
@@ -428,7 +428,7 @@ export function FluxoCaixaSection() {
                       onClick={() => toggle(per.key)}
                       className="cursor-pointer border-b border-border/50 hover:bg-surface/50"
                     >
-                      <td className="px-4 py-3 font-semibold text-foreground">
+                      <td className="px-3 py-1.5 font-semibold text-foreground">
                         <span className="inline-flex items-center gap-1">
                           {open ? (
                             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -441,13 +441,13 @@ export function FluxoCaixaSection() {
                       <td className="hidden px-4 py-3 text-right text-soft-foreground sm:table-cell">
                         {brl(per.saldoInicial)}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-blue">
+                      <td className="px-3 py-1.5 text-right font-semibold text-blue">
                         {per.entradas > 0 ? brl(per.entradas) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-red">
+                      <td className="px-3 py-1.5 text-right font-semibold text-red">
                         {per.saidas > 0 ? brl(per.saidas) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-green">
+                      <td className="px-3 py-1.5 text-right font-bold text-green">
                         {brl(per.saldoFinal)}
                       </td>
                     </tr>
@@ -475,10 +475,10 @@ export function FluxoCaixaSection() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Fornecedor</th>
-                <th className="px-4 py-3 text-center font-medium">Envios</th>
+                <th className="px-3 py-2 font-medium">Fornecedor</th>
+                <th className="px-3 py-2 text-center font-medium">Envios</th>
                 <th className="hidden px-4 py-3 text-center font-medium sm:table-cell">Último</th>
-                <th className="px-4 py-3 text-right font-medium">Total saído</th>
+                <th className="px-3 py-2 text-right font-medium">Total saído</th>
               </tr>
             </thead>
             <tbody>
@@ -491,7 +491,7 @@ export function FluxoCaixaSection() {
                       onClick={() => toggle(key)}
                       className="cursor-pointer border-b border-border/50 hover:bg-surface/50"
                     >
-                      <td className="px-4 py-3 font-semibold text-foreground">
+                      <td className="px-3 py-1.5 font-semibold text-foreground">
                         <span className="inline-flex items-center gap-1">
                           {open ? (
                             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -501,11 +501,11 @@ export function FluxoCaixaSection() {
                           {f.fornecedor}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center text-soft-foreground">{f.envios}</td>
+                      <td className="px-3 py-1.5 text-center text-soft-foreground">{f.envios}</td>
                       <td className="hidden px-4 py-3 text-center text-soft-foreground sm:table-cell">
                         {fmtDataBR(f.ultimoEnvio).slice(0, 5)}
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-red">{brl(f.total)}</td>
+                      <td className="px-3 py-1.5 text-right font-bold text-red">{brl(f.total)}</td>
                     </tr>
                     {open && (
                       <tr className="border-b border-border/50 bg-surface/40">

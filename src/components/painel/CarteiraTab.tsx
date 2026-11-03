@@ -66,7 +66,7 @@ function EnvioFornecedorCard({
   };
 
   return (
-    <div className="rounded-xl border border-blue/40 bg-card">
+    <div className="rounded-lg border border-blue/40 bg-card">
       <button
         className="flex w-full items-center justify-between gap-3 px-4 py-3"
         onClick={() => setOpen((o) => !o)}
@@ -74,7 +74,7 @@ function EnvioFornecedorCard({
         <div className="flex items-center gap-2 min-w-0">
           <PackageCheck className="h-4 w-4 shrink-0 text-blue" />
           <span className="truncate text-sm font-semibold text-foreground">{fornecedor}</span>
-          <span className="rounded-full bg-blue-dim px-2 py-0.5 text-[11px] font-bold text-blue">
+          <span className="rounded bg-blue-dim px-2 py-0.5 text-[11px] font-bold text-blue">
             {nfs.length} NF{nfs.length > 1 ? "s" : ""}
           </span>
         </div>
@@ -128,7 +128,7 @@ function EnvioFornecedorCard({
           <button
             onClick={handleEnviar}
             disabled={isEnviando || selecionadas.size === 0}
-            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-green px-3 py-2.5 text-sm font-bold text-background hover:bg-green/90 active:scale-95 disabled:opacity-60 transition-all"
+            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-green px-3 py-2.5 text-sm font-bold text-background hover:bg-green/90 disabled:opacity-60 transition-colors"
           >
             <CheckCircle2 className="h-4 w-4" />
             {isEnviando ? "Registrando saída..." : "Registrar saída de cheque"}
@@ -200,16 +200,16 @@ export function CarteiraTab({
   }, [notas]);
 
   const pieData = [
-    { name: "Em Carteira",  value: totals.emCarteira.val,  color: "#F0B429" },
-    { name: "Separado",     value: totals.separados.val,   color: "#58A6FF" },
-    { name: "Aguardando",   value: totals.aguardando.val,  color: "#8B949E" },
+    { name: "Em Carteira",  value: totals.emCarteira.val,  color: "#0d3d7a" },
+    { name: "Separado",     value: totals.separados.val,   color: "#4aa3ef" },
+    { name: "Aguardando",   value: totals.aguardando.val,  color: "#5b6e8c" },
   ].filter((d) => d.value > 0);
 
   return (
     <div className="space-y-6">
       {/* Alerta de NFs prontas */}
       {totals.emCarteira.qtd > 0 && (
-        <div className="flex items-start gap-3 rounded-xl border border-orange/40 bg-orange-dim p-4">
+        <div className="flex items-start gap-3 rounded-lg border border-orange/40 bg-orange-dim p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-orange" />
           <div>
             <div className="font-semibold text-orange">
@@ -251,27 +251,27 @@ export function CarteiraTab({
 
       {/* Charts — desktop */}
       <div className="hidden lg:grid gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-border bg-card p-4 lg:col-span-2">
+        <div className="rounded-lg border border-border bg-card p-4 lg:col-span-2">
           <div className="mb-3 text-sm font-semibold text-foreground">Valor por fornecedor</div>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={porFornecedor} margin={{ left: 8, right: 8, top: 8 }}>
-              <CartesianGrid stroke="#2D3748" vertical={false} />
-              <XAxis dataKey="fornecedor" stroke="#8B949E" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={60} />
-              <YAxis stroke="#8B949E" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ background: "#1C2330", border: "1px solid #2D3748", borderRadius: 12, color: "#E6EDF3" }} formatter={(v: number) => brl(v)} />
-              <Bar dataKey="valor" fill="#F0B429" radius={[6, 6, 0, 0]} />
+              <CartesianGrid stroke="#cfe3f7" vertical={false} />
+              <XAxis dataKey="fornecedor" stroke="#5b6e8c" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={60} />
+              <YAxis stroke="#5b6e8c" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #cfe3f7", borderRadius: 6, color: "#15305c" }} formatter={(v: number) => brl(v)} />
+              <Bar dataKey="valor" fill="#0d3d7a" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-lg border border-border bg-card p-4">
           <div className="mb-3 text-sm font-semibold text-foreground">Distribuição</div>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
-                {pieData.map((d, i) => <Cell key={i} fill={d.color} stroke="#161B22" strokeWidth={2} />)}
+                {pieData.map((d, i) => <Cell key={i} fill={d.color} stroke="#ffffff" strokeWidth={2} />)}
               </Pie>
-              <Tooltip contentStyle={{ background: "#1C2330", border: "1px solid #2D3748", borderRadius: 12, color: "#E6EDF3" }} formatter={(v: number) => brl(v)} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "#C9D1D9" }} />
+              <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #cfe3f7", borderRadius: 6, color: "#15305c" }} formatter={(v: number) => brl(v)} />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#3d5170" }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -293,7 +293,7 @@ export function CarteiraTab({
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 ${
+              className={`shrink-0 rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
                 filter === f ? "bg-gold text-background" : "bg-surface text-soft-foreground hover:bg-border/40"
               }`}
             >
@@ -320,24 +320,24 @@ export function CarteiraTab({
             />
           ))}
           {filtered.length === 0 && (
-            <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
               Nenhuma nota neste filtro.
             </div>
           )}
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-card">
+        <div className="rounded-lg border border-border bg-card">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Fornecedor</th>
-                  <th className="px-4 py-3 font-medium">NF</th>
-                  <th className="px-4 py-3 font-medium">Filial</th>
-                  <th className="px-4 py-3 text-right font-medium">Valor</th>
-                  <th className="px-4 py-3 font-medium">Entrega</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  {canEdit && <th className="px-4 py-3 font-medium">Ação</th>}
+                  <th className="px-3 py-2 font-medium">Fornecedor</th>
+                  <th className="px-3 py-2 font-medium">NF</th>
+                  <th className="px-3 py-2 font-medium">Filial</th>
+                  <th className="px-3 py-2 text-right font-medium">Valor</th>
+                  <th className="px-3 py-2 font-medium">Entrega</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  {canEdit && <th className="px-3 py-2 font-medium">Ação</th>}
                 </tr>
               </thead>
               <tbody>
@@ -348,12 +348,12 @@ export function CarteiraTab({
                   const enviado    = isEnviado(n);
                   return (
                     <tr key={n.id} className={`border-b border-border/50 last:border-0 hover:bg-surface/50 ${separado ? "bg-blue-dim/10" : ""}`}>
-                      <td className="px-4 py-3 font-medium text-foreground">{n.fornecedor}</td>
-                      <td className="px-4 py-3 text-soft-foreground">{n.nf}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{n.filial}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-foreground">{brl(n.valor)}</td>
-                      <td className="px-4 py-3 text-xs text-soft-foreground">{n.entrega}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-1.5 font-medium text-foreground">{n.fornecedor}</td>
+                      <td className="px-3 py-1.5 text-soft-foreground">{n.nf}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground">{n.filial}</td>
+                      <td className="px-3 py-1.5 text-right font-semibold text-foreground">{brl(n.valor)}</td>
+                      <td className="px-3 py-1.5 text-xs text-soft-foreground">{n.entrega}</td>
+                      <td className="px-3 py-1.5">
                         {enviado ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-green-dim px-2 py-0.5 text-xs font-bold text-green">
                             <CheckCircle2 className="h-3 w-3" /> Enviado {fmtDate(n.chequeEnviadoEm)}
@@ -373,13 +373,13 @@ export function CarteiraTab({
                         )}
                       </td>
                       {canEdit && (
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-1.5">
                           <div className="flex items-center gap-1">
                             {aEnviar && (
                               <button
                                 onClick={() => separarNf(n.id)}
                                 disabled={isSeparandoNf === n.id}
-                                className="inline-flex items-center gap-1 rounded-md bg-blue px-2.5 py-1.5 text-xs font-bold text-background hover:bg-blue/90 active:scale-95 disabled:opacity-60 transition-all"
+                                className="inline-flex items-center gap-1 rounded-md bg-blue px-2.5 py-1.5 text-xs font-bold text-background hover:bg-blue/90 disabled:opacity-60 transition-colors"
                               >
                                 <PackageCheck className="h-3 w-3" />
                                 {isSeparandoNf === n.id ? "..." : "Separar"}
@@ -389,7 +389,7 @@ export function CarteiraTab({
                               <button
                                 onClick={() => cancelarSeparacao(n.id)}
                                 disabled={isCancelando === n.id}
-                                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-soft-foreground hover:text-red hover:border-red/40 active:scale-95 disabled:opacity-60 transition-all"
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-soft-foreground hover:text-red hover:border-red/40 disabled:opacity-60 transition-colors"
                               >
                                 <CheckCircle2 className="h-3 w-3" />
                                 {isCancelando === n.id ? "..." : "Cancelar sep."}
@@ -423,7 +423,7 @@ export function CarteiraTab({
             <AlertDialogCancel className="active:scale-95">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { if (deleteTarget) removeNota(deleteTarget.id); setDeleteTarget(null); }}
-              className="bg-red text-background hover:bg-red/90 active:scale-95"
+              className="bg-red text-background hover:bg-red/90"
             >
               Remover
             </AlertDialogAction>

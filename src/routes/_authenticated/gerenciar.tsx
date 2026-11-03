@@ -1,3 +1,4 @@
+import { LeyLogo } from "@/components/LeyLogo";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { ArrowLeft, Plus, Pencil, Trash2, Save, X, Users, Search, History, UserPlus, Copy, RefreshCw } from "lucide-react";
@@ -36,13 +37,15 @@ function GerenciarPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="header-gradient sticky top-0 z-40 border-b border-border">
+      <header className="bg-surface sticky top-0 z-40 border-b-2 border-b-[#4aa3ef]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div>
-            <div className="text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">
-              ◆ Gerenciamento
+          <div className="flex items-center gap-3">
+            <LeyLogo className="h-9" />
+            <span className="h-6 w-px bg-border" />
+            <div>
+              <div className="text-[11px] font-semibold tracking-[0.18em] text-[#1c3d99] uppercase">Gerenciamento</div>
+              <h1 className="text-lg font-extrabold text-foreground">Cadastros</h1>
             </div>
-            <h1 className="text-xl font-bold text-foreground sm:text-2xl">Cadastros</h1>
           </div>
           <Link
             to="/"
@@ -54,7 +57,7 @@ function GerenciarPage() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 pt-5 sm:px-6">
-        <div className="inline-flex flex-wrap rounded-xl border border-border bg-surface p-1">
+        <div className="inline-flex flex-wrap rounded-lg border border-border bg-surface p-1">
           {([
             { id: "nfs", label: "Notas Fiscais" },
             { id: "caixa", label: "Movimentos de Caixa" },
@@ -185,18 +188,18 @@ function NotasManager() {
         />
       )}
 
-      <div className="rounded-xl border border-border bg-card">
+      <div className="rounded-lg border border-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Fornecedor</th>
-                <th className="px-4 py-3 font-medium">NF</th>
-                <th className="px-4 py-3 font-medium">Filial</th>
-                <th className="px-4 py-3 text-right font-medium">Valor</th>
-                <th className="px-4 py-3 font-medium">Entrega</th>
-                <th className="px-4 py-3 font-medium">Cheque</th>
-                <th className="px-4 py-3 text-right font-medium">Ações</th>
+                <th className="px-3 py-2 font-medium">Fornecedor</th>
+                <th className="px-3 py-2 font-medium">NF</th>
+                <th className="px-3 py-2 font-medium">Filial</th>
+                <th className="px-3 py-2 text-right font-medium">Valor</th>
+                <th className="px-3 py-2 font-medium">Entrega</th>
+                <th className="px-3 py-2 font-medium">Cheque</th>
+                <th className="px-3 py-2 text-right font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -204,19 +207,19 @@ function NotasManager() {
                 const enviar = isEnviar(n);
                 return (
                   <tr key={n.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
-                    <td className="px-4 py-3 font-medium text-foreground">{n.fornecedor}</td>
-                    <td className="px-4 py-3 text-soft-foreground">{n.nf}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{n.filial}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-foreground">{brl(n.valor)}</td>
-                    <td className="px-4 py-3 text-xs text-soft-foreground">{n.entrega}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-1.5 font-medium text-foreground">{n.fornecedor}</td>
+                    <td className="px-3 py-1.5 text-soft-foreground">{n.nf}</td>
+                    <td className="px-3 py-1.5 text-muted-foreground">{n.filial}</td>
+                    <td className="px-3 py-1.5 text-right font-semibold text-foreground">{brl(n.valor)}</td>
+                    <td className="px-3 py-1.5 text-xs text-soft-foreground">{n.entrega}</td>
+                    <td className="px-3 py-1.5">
                       <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${
                         enviar ? "bg-orange-dim text-orange" : "bg-surface text-muted-foreground ring-1 ring-border"
                       }`}>
                         {enviar ? "ENVIAR" : "Esp."}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-1.5">
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => setEditing(n)}
@@ -258,10 +261,10 @@ function NotasManager() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="active:scale-95 transition-transform">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="transition-transform">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { if (deleteTarget) removeNota(deleteTarget.id); setDeleteTarget(null); }}
-              className="bg-red text-background hover:bg-red/90 active:scale-95 transition-transform"
+              className="bg-red text-background hover:bg-red/90 transition-transform"
             >Remover</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -296,7 +299,7 @@ function NotaForm({
           entrega: form.entrega.trim().slice(0, 40),
         });
       }}
-      className="rounded-xl border border-gold/40 bg-card p-4 space-y-4"
+      className="rounded-lg border border-gold/40 bg-card p-4 space-y-4"
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Fornecedor">
@@ -427,30 +430,30 @@ function CaixaManager() {
         />
       )}
 
-      <div className="rounded-xl border border-border bg-card">
+      <div className="rounded-lg border border-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Data</th>
-                <th className="px-4 py-3 text-right font-medium">Saldo Ant.</th>
-                <th className="px-4 py-3 text-right font-medium">Entrada</th>
-                <th className="px-4 py-3 text-right font-medium">Saída</th>
-                <th className="px-4 py-3 text-right font-medium">Total</th>
-                <th className="px-4 py-3 font-medium">Destino</th>
-                <th className="px-4 py-3 text-right font-medium">Ações</th>
+                <th className="px-3 py-2 font-medium">Data</th>
+                <th className="px-3 py-2 text-right font-medium">Saldo Ant.</th>
+                <th className="px-3 py-2 text-right font-medium">Entrada</th>
+                <th className="px-3 py-2 text-right font-medium">Saída</th>
+                <th className="px-3 py-2 text-right font-medium">Total</th>
+                <th className="px-3 py-2 font-medium">Destino</th>
+                <th className="px-3 py-2 text-right font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
                 <tr key={c.id} className="border-b border-border/50 last:border-0 hover:bg-surface/50">
-                  <td className="px-4 py-3 font-semibold text-foreground">{c.data}</td>
-                  <td className="px-4 py-3 text-right text-soft-foreground">{brl(c.saldoAnterior)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-blue">{c.entrada > 0 ? brl(c.entrada) : "—"}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-red">{c.saida > 0 ? brl(c.saida) : "—"}</td>
-                  <td className="px-4 py-3 text-right font-bold text-green">{brl(c.saldoTotal)}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.destino ?? "—"}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-1.5 font-semibold text-foreground">{c.data}</td>
+                  <td className="px-3 py-1.5 text-right text-soft-foreground">{brl(c.saldoAnterior)}</td>
+                  <td className="px-3 py-1.5 text-right font-semibold text-blue">{c.entrada > 0 ? brl(c.entrada) : "—"}</td>
+                  <td className="px-3 py-1.5 text-right font-semibold text-red">{c.saida > 0 ? brl(c.saida) : "—"}</td>
+                  <td className="px-3 py-1.5 text-right font-bold text-green">{brl(c.saldoTotal)}</td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">{c.destino ?? "—"}</td>
+                  <td className="px-3 py-1.5">
                     <div className="flex justify-end gap-1">
                       <button onClick={() => setEditing(c)} className="rounded-md p-1.5 text-blue hover:bg-blue-dim" aria-label="Editar">
                         <Pencil className="h-4 w-4" />
@@ -483,10 +486,10 @@ function CaixaManager() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="active:scale-95 transition-transform">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="transition-transform">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { if (deleteTarget) removeCaixa(deleteTarget.id); setDeleteTarget(null); }}
-              className="bg-red text-background hover:bg-red/90 active:scale-95 transition-transform"
+              className="bg-red text-background hover:bg-red/90 transition-transform"
             >Remover</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -540,7 +543,7 @@ function CaixaForm({
           saldoTotal: totalCalc,
         });
       }}
-      className="rounded-xl border border-gold/40 bg-card p-4 space-y-4"
+      className="rounded-lg border border-gold/40 bg-card p-4 space-y-4"
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Data (DD/MM)">
@@ -622,12 +625,12 @@ function TeamManager() {
       {error && <div className="text-sm text-red">{(error as Error).message}</div>}
 
       {team && (
-        <div className="rounded-xl border border-border bg-card">
+        <div className="rounded-lg border border-border bg-card">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Usuário</th>
+                  <th className="px-3 py-2 font-medium">Usuário</th>
                   {ALL_ROLES.map((r) => (
                     <th key={r} className="px-3 py-3 text-center font-medium">
                       <div>{ROLE_LABELS[r].label}</div>
@@ -641,7 +644,7 @@ function TeamManager() {
               <tbody>
                 {team.map((u) => (
                   <tr key={u.id} className="border-b border-border/50 last:border-0">
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-1.5">
                       <div className="font-semibold text-foreground">{u.displayName || "—"}</div>
                       <div className="text-xs text-muted-foreground">{u.email}</div>
                     </td>
@@ -732,7 +735,7 @@ function NewUserForm({ onCreated }: { onCreated: () => void }) {
           <UserPlus className="h-4 w-4" /> Adicionar usuário
         </button>
         {lastCreated && (
-          <div className="rounded-xl border border-green/40 bg-green-dim/40 p-4 text-sm">
+          <div className="rounded-lg border border-green/40 bg-green-dim/40 p-4 text-sm">
             <div className="mb-2 font-semibold text-green">Usuário criado — anote a senha:</div>
             <div className="flex flex-wrap items-center gap-3 font-mono text-foreground">
               <span>{lastCreated.email}</span>
@@ -760,7 +763,7 @@ function NewUserForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); if (canSubmit) mut.mutate(); }}
-      className="rounded-xl border border-gold/40 bg-card p-4 space-y-4"
+      className="rounded-lg border border-gold/40 bg-card p-4 space-y-4"
     >
       <div className="flex items-center gap-2 text-sm font-semibold text-gold">
         <UserPlus className="h-4 w-4" /> Novo usuário
@@ -987,7 +990,7 @@ function AuditoriaManager() {
           const ident = (before.nf as string | undefined) ?? (before.data as string | undefined) ?? r.record_id.slice(0, 8);
 
           return (
-            <div key={r.id} className="rounded-xl border border-border bg-card p-4">
+            <div key={r.id} className="rounded-lg border border-border bg-card p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${
@@ -1031,7 +1034,7 @@ function AuditoriaManager() {
           );
         })}
         {!isLoading && filtered.length === 0 && (
-          <div className="rounded-xl border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
             Nenhum registro de auditoria.
           </div>
         )}

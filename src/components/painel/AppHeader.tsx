@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { LeyLogo } from "@/components/LeyLogo";
 import { LogOut, Settings2, ClipboardEdit, BarChart2, Loader2, Download } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -81,128 +82,70 @@ export function AppHeader() {
   const saldoAtual = caixa.length ? caixa[caixa.length - 1].saldoTotal : 0;
   const cobertura = totalCarteira > 0 ? (saldoAtual / totalCarteira) * 100 : 0;
 
+  const hoje = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+    .format(new Date())
+    .replace(/\./g, "");
+  const btn =
+    "inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-medium text-soft-foreground transition-colors hover:bg-surface hover:text-foreground disabled:opacity-50";
+
   return (
-    <header className="header-gradient sticky top-0 z-40 border-b border-border">
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
+    <header className="sticky top-0 z-40 border-b-2 border-b-[#4aa3ef] bg-surface">
+      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">
-            ◆ Cheques · Grupo Ley
+          <div className="flex min-w-0 items-center gap-3">
+            <LeyLogo className="h-8 sm:h-9" />
+            <span className="hidden h-6 w-px bg-border sm:block" />
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-extrabold leading-tight text-foreground sm:text-base">
+                Painel de Controle
+              </h1>
+              <span className="hidden text-[11px] text-muted-foreground sm:block">
+                Cheques · Grupo Ley · {hoje}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             {canWrite && (
               <Link
                 to="/lancamentos"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-background hover:bg-gold/90 transition-colors"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-gold px-3 text-xs font-semibold text-background transition-colors hover:bg-gold/90"
               >
                 <ClipboardEdit className="h-3.5 w-3.5" /> Lançar
               </Link>
             )}
             {isAdmin && (
-              <button
-                onClick={enviarStatus}
-                disabled={sendingStatus}
-                title="Enviar resumo ao Telegram"
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-blue hover:border-blue/40 transition-colors disabled:opacity-50"
-              >
-                {sendingStatus
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <BarChart2 className="h-3.5 w-3.5" />}
+              <button onClick={enviarStatus} disabled={sendingStatus} title="Enviar resumo ao Telegram" className={`hidden sm:inline-flex ${btn}`}>
+                {sendingStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BarChart2 className="h-3.5 w-3.5" />}
                 Status
               </button>
             )}
             {isAdmin && (
-              <button
-                onClick={exportToExcel}
-                disabled={exporting}
-                title="Exportar dados completos em Excel"
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-gold hover:border-gold/40 transition-colors disabled:opacity-50"
-              >
-                {exporting
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Download className="h-3.5 w-3.5" />}
+              <button onClick={exportToExcel} disabled={exporting} title="Exportar dados completos em Excel" className={`hidden sm:inline-flex ${btn}`}>
+                {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                 Exportar
               </button>
             )}
             {isAdmin && (
-              <Link
-                to="/gerenciar"
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-soft-foreground hover:text-gold hover:border-gold/40 transition-colors"
-              >
+              <Link to="/gerenciar" className={`hidden sm:inline-flex ${btn}`}>
                 <Settings2 className="h-3.5 w-3.5" /> Gerenciar
               </Link>
             )}
-            <button
-              onClick={() => supabase.auth.signOut()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-soft-foreground hover:text-red hover:border-red/40 transition-colors"
-              aria-label="Sair"
-            >
+            <button onClick={() => supabase.auth.signOut()} className={btn} aria-label="Sair">
               <LogOut className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold text-foreground sm:text-3xl lg:text-4xl">
-            Painel de Controle
-          </h1>
-          <span className="rounded-full bg-gold-dim px-2.5 py-0.5 text-[11px] font-semibold text-gold ring-1 ring-gold/30">
-            Hoje · {(() => {
-              const d = new Date();
-              const dia = String(d.getDate()).padStart(2, "0");
-              const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "");
-              return `${dia} ${mes} · ${d.getFullYear()}`;
-            })()}
-          </span>
-          {(() => {
-            const times: number[] = [];
-            notas.forEach((n) => n.createdAt && times.push(new Date(n.createdAt).getTime()));
-            caixa.forEach((c) => {
-              if (c.createdAt) times.push(new Date(c.createdAt).getTime());
-              if (c.data) times.push(new Date(c.data).getTime());
-            });
-            const valid = times.filter((t) => Number.isFinite(t));
-            if (!valid.length) return null;
-            const d = new Date(Math.max(...valid));
-            const dia = String(d.getDate()).padStart(2, "0");
-            const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "");
-            const hh = String(d.getHours()).padStart(2, "0");
-            const mm = String(d.getMinutes()).padStart(2, "0");
-            return (
-              <span className="rounded-full bg-blue-dim px-2.5 py-0.5 text-[11px] font-semibold text-blue ring-1 ring-blue/30">
-                Última atualização · {dia} {mes} · {d.getFullYear()} · {hh}:{mm}
-              </span>
-            );
-          })()}
-          {isAdmin && (
-            <span className="rounded-full bg-green-dim px-2.5 py-0.5 text-[11px] font-semibold text-green ring-1 ring-green/30">
-              Admin
-            </span>
-          )}
-        </div>
-
-        {/* KPIs: carrossel snap no mobile, grid no desktop */}
-        <div className="mt-4 -mx-4 sm:mx-0">
-          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0">
-            <KpiBlock
-              label="Carteira de NFs"
-              value={brl(totalCarteira)}
-              hint={`${notas.length} notas em aberto`}
-              tone="default"
-            />
-            <KpiBlock
-              label="Saldo em Caixa"
-              value={brl(saldoAtual)}
-              hint={
-                <>
-                  Cobertura de{" "}
-                  <span className="font-semibold text-green">{cobertura.toFixed(0)}%</span>
-                </>
-              }
-              tone="green"
-            />
-          </div>
-        </div>
+        <dl className="mt-3 grid grid-cols-2 divide-x divide-border rounded-md border border-border bg-card">
+          <KpiBlock label="Carteira de NFs" value={brl(totalCarteira)} hint={`${notas.length} notas em aberto`} tone="default" />
+          <KpiBlock
+            label="Saldo em Caixa"
+            value={brl(saldoAtual)}
+            hint={<>Cobertura de <span className="font-semibold text-green">{cobertura.toFixed(0)}%</span></>}
+            tone="green"
+          />
+        </dl>
       </div>
     </header>
   );
@@ -220,16 +163,12 @@ function KpiBlock({
   tone: "default" | "green";
 }) {
   return (
-    <div className="min-w-[82%] snap-start rounded-xl border border-border bg-card/60 p-4 backdrop-blur sm:min-w-0">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div
-        className={`mt-1 truncate whitespace-nowrap tabular-nums leading-tight text-xl font-bold sm:text-3xl ${
-          tone === "green" ? "text-green" : "text-foreground"
-        }`}
-      >
+    <div className="min-w-0 px-3 py-2.5 sm:px-4">
+      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className={`mt-0.5 truncate whitespace-nowrap text-lg font-semibold tabular-nums leading-tight sm:text-2xl ${tone === "green" ? "text-green" : "text-foreground"}`}>
         {value}
-      </div>
-      <div className="text-xs text-soft-foreground">{hint}</div>
+      </dd>
+      <dd className="text-xs text-soft-foreground">{hint}</dd>
     </div>
   );
 }

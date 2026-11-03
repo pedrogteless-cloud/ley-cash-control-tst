@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { LeyLogo } from "@/components/LeyLogo";
 import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/auth")({
@@ -48,11 +49,13 @@ function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
-        <div className="mb-6 text-center">
-          <div className="text-[11px] font-semibold tracking-[0.18em] text-gold uppercase">◆ Grupo Ley</div>
-          <h1 className="mt-1 text-xl font-bold text-foreground">Painel de Cheques</h1>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+      <img src="/ley-monograma.png" alt="" aria-hidden className="pointer-events-none absolute -bottom-16 -left-24 w-[520px] max-w-none opacity-60" />
+      <div className="relative w-full max-w-sm rounded-lg border border-border bg-card p-6">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <LeyLogo className="h-14" />
+          <div className="mt-3 h-1.5 w-[72px] rounded bg-[#4aa3ef]" />
+          <h1 className="mt-3 text-lg font-extrabold text-foreground">Painel de Cheques</h1>
           <p className="mt-1 text-xs text-muted-foreground">Entre na sua conta</p>
         </div>
 

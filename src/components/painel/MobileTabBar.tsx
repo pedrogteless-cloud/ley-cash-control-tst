@@ -18,7 +18,7 @@ export function MobileTabBar({
   const { canWrite, isAdmin } = useRoles();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 backdrop-blur sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 sm:hidden">
       <div className="mx-auto flex max-w-7xl items-stretch justify-around px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1.5">
         {onPainel ? (
           <>

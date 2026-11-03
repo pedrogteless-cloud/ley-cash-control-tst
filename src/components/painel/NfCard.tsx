@@ -35,7 +35,7 @@ export function NfCard({
   const naoChegou  = n.entrega.toUpperCase().includes("NÃO");
 
   return (
-    <div className={`rounded-xl border bg-card p-4 transition-colors active:bg-surface/60 ${
+    <div className={`rounded-lg border bg-card p-4 transition-colors active:bg-surface/60 ${
       separado ? "border-blue/40" : "border-border"
     }`}>
       <div className="flex items-start justify-between gap-3">
@@ -77,7 +77,7 @@ export function NfCard({
             <button
               onClick={onSeparar}
               disabled={separando}
-              className="mr-auto inline-flex min-h-11 items-center gap-1.5 rounded-md bg-blue px-3 py-2 text-xs font-bold text-background hover:bg-blue/90 active:scale-95 disabled:opacity-60 transition-all"
+              className="mr-auto inline-flex min-h-11 items-center gap-1.5 rounded-md bg-blue px-3 py-2 text-xs font-bold text-background hover:bg-blue/90 disabled:opacity-60 transition-colors"
             >
               {separando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
               {separando ? "Separando..." : "Separar p/ envio"}
@@ -87,7 +87,7 @@ export function NfCard({
             <button
               onClick={onCancelarSeparacao}
               disabled={cancelando}
-              className="mr-auto inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-xs font-semibold text-soft-foreground hover:text-red hover:border-red/40 active:scale-95 disabled:opacity-60 transition-all"
+              className="mr-auto inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-xs font-semibold text-soft-foreground hover:text-red hover:border-red/40 disabled:opacity-60 transition-colors"
             >
               {cancelando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
               {cancelando ? "Cancelando..." : "Cancelar separação"}
@@ -95,13 +95,13 @@ export function NfCard({
           )}
           <button
             onClick={onEdit}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-blue hover:bg-blue-dim active:scale-95 transition-all"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-blue hover:bg-blue-dim transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" /> Editar
           </button>
           <button
             onClick={onDelete}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-red hover:bg-red-dim active:scale-95 transition-all"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold text-red hover:bg-red-dim transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" /> Excluir
           </button>

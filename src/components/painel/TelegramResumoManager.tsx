@@ -115,7 +115,7 @@ export function TelegramResumoManager() {
         <Send className="h-5 w-5 text-gold" /> Telegram
       </h2>
 
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 space-y-1">
             <div className="text-sm font-semibold text-foreground">Resumo do dia em imagem</div>
@@ -161,16 +161,16 @@ export function TelegramResumoManager() {
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red/40 bg-red-dim/40 p-4 text-sm text-red">
+        <div className="rounded-lg border border-red/40 bg-red-dim/40 p-4 text-sm text-red">
           Não foi possível carregar o status: {(error as Error).message}
         </div>
       ) : !ultimo ? (
-        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Nenhum envio ainda. Use "Enviar agora" para testar.
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="rounded-xl border border-border bg-card p-4">
+          <div className="rounded-lg border border-border bg-card p-4">
             <div className="mb-3 flex items-center justify-between gap-2 text-sm">
               <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
                 <ImageIcon className="h-4 w-4 text-gold" /> Último envio ·{" "}
@@ -187,7 +187,7 @@ export function TelegramResumoManager() {
             </a>
           </div>
 
-          <div className="rounded-xl border border-border bg-card">
+          <div className="rounded-lg border border-border bg-card">
             <div className="border-b border-border p-4 text-sm font-semibold text-foreground">
               Últimos envios
             </div>
@@ -195,13 +195,13 @@ export function TelegramResumoManager() {
               <tbody>
                 {data!.envios.map((e) => (
                   <tr key={e.id} className="border-b border-border/50 last:border-0">
-                    <td className="px-4 py-3 font-semibold text-foreground">
+                    <td className="px-3 py-1.5 font-semibold text-foreground">
                       {fmtDataHora(e.enviado_em)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">
                       {e.origem === "cron" ? "Automático" : "Manual"}
                     </td>
-                    <td className="px-4 py-3 text-right text-xs">
+                    <td className="px-3 py-1.5 text-right text-xs">
                       <EnvioStatus e={e} />
                     </td>
                   </tr>

@@ -39,8 +39,8 @@ function Painel() {
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
       <AppHeader />
 
-      <div className="mx-auto max-w-7xl px-4 pt-5 sm:px-6 hidden sm:block">
-        <div className="inline-flex rounded-xl border border-border bg-surface p-1">
+      <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 hidden sm:block">
+        <div className="flex gap-6 border-b border-border">
           {([
             { id: "carteira", label: "Carteira NFs" },
             { id: "caixa", label: "Caixa de Cheques" },
@@ -48,8 +48,8 @@ function Painel() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                tab === t.id ? "bg-card text-gold ring-1 ring-gold/40" : "text-soft-foreground hover:text-foreground"
+              className={`-mb-px border-b-2 px-1 pb-2.5 text-sm font-medium transition-colors ${
+                tab === t.id ? "border-gold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {t.label}
@@ -58,8 +58,8 @@ function Painel() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-4">
-        <div className="flex items-start gap-3 rounded-xl border border-blue/30 bg-blue-dim/40 p-3 text-sm">
+      <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 space-y-4">
+        <div className="flex items-start gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue" />
           <div className="text-soft-foreground">
             <span className="font-semibold text-foreground">Esta tela é só para consultar.</span>{" "}
@@ -75,7 +75,7 @@ function Painel() {
       </main>
 
       <footer className="border-t border-border bg-surface mb-16 sm:mb-0">
-        <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-gold sm:px-6">
+        <div className="mx-auto max-w-7xl px-4 py-3 text-center text-xs text-muted-foreground sm:px-6">
           Atualizado em {atualizadoEm}
         </div>
       </footer>

@@ -16,7 +16,6 @@ export function KpiCard({
   hint,
   explain,
   tone = "gold",
-  icon,
 }: {
   label: string;
   value: string;
@@ -28,14 +27,11 @@ export function KpiCard({
 }) {
   const t = toneMap[tone] ?? toneMap.gold;
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-border/70">
+    <div className="rounded-md border border-border bg-card px-3.5 py-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
-        {icon && (
-          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${t.bg} ${t.fg}`}>{icon}</div>
-        )}
+        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
       </div>
-      <div className={`mt-2 whitespace-nowrap text-lg font-bold sm:text-xl xl:text-2xl ${t.fg}`}>{value}</div>
+      <div className={`mt-1 whitespace-nowrap text-lg font-semibold tabular-nums sm:text-xl ${t.fg}`}>{value}</div>
       {hint && <div className="mt-1 text-xs text-soft-foreground">{hint}</div>}
       {explain && (
         <div className="mt-1.5 text-[11px] leading-snug text-muted-foreground sm:hidden">
