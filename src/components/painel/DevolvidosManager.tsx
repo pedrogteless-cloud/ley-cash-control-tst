@@ -112,8 +112,8 @@ export function DevolvidosManager() {
       setForm({
         data: r.data,
         valor_devolvido: r.valor_devolvido,
-        valor_rec_fornecedor: 0,
-        valor_rec_empresa: rowRecovered(r),
+        valor_rec_fornecedor: Number(r.valor_rec_fornecedor || 0),
+        valor_rec_empresa: Number(r.valor_rec_empresa || 0),
       });
     }
   }, [editingId, rows]);
@@ -244,14 +244,8 @@ export function DevolvidosManager() {
       toast.error("Os valores não podem ser negativos");
       return;
     }
-    const normalizedForm = {
-      ...form,
-      valor_rec_fornecedor: 0,
-      valor_rec_empresa: rowRecovered(form),
-    };
-    const payload =
-      mode === "recuperacao" ? { ...normalizedForm, valor_devolvido: 0 } : normalizedForm;
-    const totalRecuperado = payload.valor_rec_empresa;
+    const payload = mode === "recuperacao" ? { ...form, valor_devolvido: 0 } : form;
+    const totalRecuperado = rowRecovered(payload);
     if (mode === "devolvido" && totalRecuperado > payload.valor_devolvido) {
       toast.error("O total recuperado não pode ser maior que o valor devolvido");
       return;
@@ -293,6 +287,8 @@ export function DevolvidosManager() {
     return {
       voltouMes,
       recuperadoMes: recFMes + recEMes,
+      recFornecedorMes: recFMes,
+      recLeyMes: recEMes,
       pendenteTotal: voltouTotal - recTotal,
     };
   }, [monthRows, rows]);
@@ -449,12 +445,7 @@ export function DevolvidosManager() {
             type="button"
             onClick={() => {
               setMode("recuperacao");
-              setForm((f) => ({
-                ...f,
-                valor_devolvido: 0,
-                valor_rec_fornecedor: 0,
-                valor_rec_empresa: rowRecovered(f),
-              }));
+              setForm((f) => ({ ...f, valor_devolvido: 0 }));
             }}
             className={`rounded-md px-3 py-1.5 transition-colors ${
               mode === "recuperacao"
@@ -498,23 +489,46 @@ export function DevolvidosManager() {
               </div>
             </div>
           )}
-          <Field label="Valor recuperado (R$)">
+          <Field label="Recuperado — fornecedor (R$)">
             <input
               type="number"
               step="0.01"
               min="0"
-              value={rowRecovered(form) || ""}
+              value={form.valor_rec_fornecedor || ""}
               onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  valor_rec_fornecedor: 0,
-                  valor_rec_empresa: Number(e.target.value),
-                }))
+                setForm((f) => ({ ...f, valor_rec_fornecedor: Number(e.target.value) }))
+              }
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Recuperado — Ley Colchões (R$)">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.valor_rec_empresa || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, valor_rec_empresa: Number(e.target.value) }))
               }
               className={inputCls}
             />
           </Field>
         </div>
+
+        {rowRecovered(form) > 0 && (
+          <div className="text-xs text-muted-foreground">
+            Total recuperado:{" "}
+            <span className="font-semibold text-blue">{brl(rowRecovered(form))}</span>
+            {mode === "devolvido" && form.valor_devolvido > 0 && (
+              <>
+                {" · "}Pendente deste lançamento:{" "}
+                <span className="font-semibold text-gold">
+                  {brl(form.valor_devolvido - rowRecovered(form))}
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end">
           <button
@@ -537,7 +551,12 @@ export function DevolvidosManager() {
       {/* ── KPIs deste mês ───────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiBox label="Voltou este mês" value={brl(totals.voltouMes)} tone="text-red" />
-        <KpiBox label="Recuperado este mês" value={brl(totals.recuperadoMes)} tone="text-blue" />
+        <KpiBox
+          label="Recuperado este mês"
+          value={brl(totals.recuperadoMes)}
+          tone="text-blue"
+          hint={`Fornecedor ${brl(totals.recFornecedorMes)} · Ley ${brl(totals.recLeyMes)}`}
+        />
         <KpiBox
           label="Pendente geral"
           value={totals.pendenteTotal <= 0 ? "✓ Tudo quitado" : brl(totals.pendenteTotal)}
@@ -679,7 +698,19 @@ function EntriesTable({
                   </td>
                   <td className="px-3 py-1.5 text-right text-blue">
                     {recuperado > 0 ? (
-                      brl(recuperado)
+                      <>
+                        <div>{brl(recuperado)}</div>
+                        <div className="text-[11px] font-normal text-muted-foreground">
+                          {[
+                            Number(r.valor_rec_fornecedor) > 0 &&
+                              `Forn. ${brl(Number(r.valor_rec_fornecedor))}`,
+                            Number(r.valor_rec_empresa) > 0 &&
+                              `Ley ${brl(Number(r.valor_rec_empresa))}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
+                      </>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -736,7 +767,17 @@ function isRecoveryOnly(r: Row) {
   return Number(r.valor_devolvido || 0) <= 0 && rowRecovered(r) > 0;
 }
 
-function KpiBox({ label, value, tone }: { label: string; value: string; tone: string }) {
+function KpiBox({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+  hint?: string;
+}) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -745,6 +786,7 @@ function KpiBox({ label, value, tone }: { label: string; value: string; tone: st
       <div className={`mt-2 whitespace-nowrap text-lg font-bold sm:text-xl xl:text-2xl ${tone}`}>
         {value}
       </div>
+      {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
 }
